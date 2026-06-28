@@ -24,6 +24,7 @@ export interface Lead {
   scraping_target_id: string | null;
   call_attempts: number;
   last_called_at: string | null;
+  assigned_to?: string | null;
   qualification_score?: number | null;
   created_at: string;
   updated_at: string;
