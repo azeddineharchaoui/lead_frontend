@@ -8,6 +8,8 @@ export const API = {
     pending: "/api/v1/leads/pending",
     detail: (id: string) => `/api/v1/leads/${id}`,
     status: (id: string) => `/api/v1/leads/${id}/status`,
+    history: (id: string) => `/api/v1/leads/${id}/history`,
+    assign: (id: string) => `/api/v1/leads/${id}/assign`,
     sessions: (leadId: string) => `/api/v1/leads/${leadId}/sessions`,
     session: (leadId: string, sessionId: string) =>
       `/api/v1/leads/${leadId}/sessions/${sessionId}`,

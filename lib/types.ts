@@ -26,8 +26,32 @@ export interface Lead {
   last_called_at: string | null;
   assigned_to?: string | null;
   qualification_score?: number | null;
+  crm_pushed_at?: string | null;
+  crm_push_attempts?: number;
+  crm_last_error?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface HistoryEntry {
+  id: string;
+  from_status: string | null;
+  to_status: string;
+  changed_by: string | null;
+  reason: string | null;
+  extra_data: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface LeadStatusUpdate {
+  status: LeadStatus;
+  notes?: string | null;
+}
+
+export interface LeadUpdate {
+  notes?: string | null;
+  company_name?: string | null;
+  assigned_to?: string | null;
 }
 
 export interface LeadSessionSummary {
