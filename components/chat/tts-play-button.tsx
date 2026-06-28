@@ -1,72 +1,75 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { Volume2, Pause, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { fetchTTS } from '@/lib/api/chat'
-import { useApi } from '@/lib/api-context'
-import { toast } from 'sonner'
+import { Volume2, Loader2, Pause, Play } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface TtsPlayButtonProps {
+  messageId: string
   text: string
-  lang?: string
+  isPlaying?: boolean
+  isLoading?: boolean
+  onPlay: (messageId: string, text: string) => void
+  onStop: () => void
+  onPause: () => void
+  onResume: () => void
+  compact?: boolean
 }
 
-export function TtsPlayButton({ text, lang = 'fr' }: TtsPlayButtonProps) {
-  const api = useApi()
-  const [isLoading, setIsLoading] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const audioRef = useRef<HTMLAudioElement>(null)
+export function TtsPlayButton({
+  messageId,
+  text,
+  isPlaying = false,
+  isLoading = false,
+  onPlay,
+  onStop,
+  onPause,
+  onResume,
+  compact = false,
+}: TtsPlayButtonProps) {
+  const isCurrentMessage = isPlaying || isLoading
+  const isEmpty = !text || text.trim().length === 0
 
-  const handlePlay = async () => {
-    if (isPlaying) {
-      audioRef.current?.pause()
-      setIsPlaying(false)
-      return
-    }
+  if (isEmpty) {
+    return null
+  }
 
-    setIsLoading(true)
-    try {
-      const blob = await fetchTTS(api, text, lang)
-      const url = URL.createObjectURL(blob)
-
-      if (audioRef.current) {
-        audioRef.current.src = url
-        audioRef.current.play()
-        setIsPlaying(true)
-
-        audioRef.current.onended = () => {
-          setIsPlaying(false)
-          URL.revokeObjectURL(url)
-        }
-      }
-    } catch (err) {
-      toast.error('Synthèse vocale indisponible')
-      console.error('[v0] TTS error:', err)
-    } finally {
-      setIsLoading(false)
+  const handleClick = () => {
+    if (isCurrentMessage && isPlaying) {
+      onPause()
+    } else if (isCurrentMessage && !isPlaying) {
+      onResume()
+    } else if (isCurrentMessage && isLoading) {
+      // Do nothing while loading
+    } else {
+      onPlay(messageId, text)
     }
   }
 
   return (
-    <>
-      <audio ref={audioRef} />
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handlePlay}
-        disabled={isLoading}
-        title="Écouter le message"
-        className="h-8 w-8 p-0"
-      >
-        {isLoading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : isPlaying ? (
-          <Pause className="w-4 h-4" />
-        ) : (
-          <Volume2 className="w-4 h-4" />
-        )}
-      </Button>
-    </>
+    <Button
+      type="button"
+      variant="ghost"
+      size={compact ? 'sm' : 'icon'}
+      onClick={handleClick}
+      disabled={isLoading}
+      className={cn(
+        'text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400',
+        'transition-colors opacity-0 group-hover:opacity-100 lg:opacity-100',
+        isCurrentMessage && 'opacity-100 text-indigo-600 dark:text-indigo-400',
+      )}
+      aria-label="Écouter la réponse"
+      title={isLoading ? 'Chargement...' : isCurrentMessage && isPlaying ? 'Pause' : 'Écouter'}
+    >
+      {isLoading ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : isCurrentMessage && isPlaying ? (
+        <Pause className="w-4 h-4" />
+      ) : isCurrentMessage && !isPlaying ? (
+        <Play className="w-4 h-4" />
+      ) : (
+        <Volume2 className="w-4 h-4" />
+      )}
+    </Button>
   )
 }

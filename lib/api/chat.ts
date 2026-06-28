@@ -40,20 +40,55 @@ export async function sendAudioMessage(
   return res.json();
 }
 
+export async function fetchTtsAudio(
+  ctx: ApiOptions,
+  text: string,
+  lang?: "fr" | "ar",
+): Promise<Blob> {
+  if (!text || text.trim().length === 0) {
+    throw new Error("Texte vide pour la synthèse vocale")
+  }
+
+  const opts = toClientOptions(ctx)
+  const truncatedText = text.slice(0, 2000)
+  const params = new URLSearchParams({ text: truncatedText })
+  if (lang) params.set("lang", lang)
+
+  const headers: Record<string, string> = {}
+  if (opts.apiKey) headers["X-API-Key"] = opts.apiKey
+
+  try {
+    const res = await fetch(`${opts.baseUrl}${API.chat.tts}?${params.toString()}`, {
+      method: "GET",
+      headers,
+    })
+
+    if (!res.ok) {
+      if (res.status === 503) {
+        throw new Error("tts_unavailable")
+      }
+      if (res.status === 400) {
+        throw new Error("validation_error")
+      }
+      throw new Error(`HTTP ${res.status}`)
+    }
+
+    return res.blob()
+  } catch (error) {
+    if (error instanceof Error && error.message === "tts_unavailable") {
+      throw new Error("tts_unavailable")
+    }
+    throw error
+  }
+}
+
+// Legacy alias for backward compatibility
 export async function fetchTTS(
   ctx: ApiOptions,
   text: string,
   lang?: string,
 ): Promise<Blob> {
-  const opts = toClientOptions(ctx);
-  const params = new URLSearchParams({ text });
-  if (lang) params.set("lang", lang);
-
-  const headers: Record<string, string> = {};
-  if (opts.apiKey) headers["X-API-Key"] = opts.apiKey;
-  const res = await fetch(`${opts.baseUrl}${API.chat.tts}?${params.toString()}`, { headers });
-  if (!res.ok) throw new Error(`TTS error: HTTP ${res.status}`);
-  return res.blob();
+  return fetchTtsAudio(ctx, text, lang as "fr" | "ar" | undefined)
 }
 
 export async function listChatSessions(

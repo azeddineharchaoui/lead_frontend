@@ -1,14 +1,32 @@
 'use client'
 
 import { ChatMessage } from '@/lib/types'
+import { TtsPlayButton } from './tts-play-button'
 import { cn } from '@/lib/utils'
 
 interface MessageBubbleProps {
   message: ChatMessage
   isUser: boolean
+  messageId: string
+  isPlayingTts?: boolean
+  isLoadingTts?: boolean
+  onTtsPlay?: (messageId: string, text: string) => void
+  onTtsStop?: () => void
+  onTtsPause?: () => void
+  onTtsResume?: () => void
 }
 
-export function MessageBubble({ message, isUser }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  isUser,
+  messageId,
+  isPlayingTts = false,
+  isLoadingTts = false,
+  onTtsPlay,
+  onTtsStop,
+  onTtsPause,
+  onTtsResume,
+}: MessageBubbleProps) {
   const timestamp = new Date(message.timestamp).toLocaleTimeString('fr-FR', {
     hour: '2-digit',
     minute: '2-digit',
@@ -25,26 +43,43 @@ export function MessageBubble({ message, isUser }: MessageBubbleProps) {
   }
 
   return (
-    <div className={cn('flex gap-2 mb-3', isUser && 'flex-row-reverse')}>
+    <div className={cn('flex gap-2 mb-3 group', isUser && 'flex-row-reverse')}>
       <div
         className={cn(
           'max-w-xs lg:max-w-md px-4 py-2 rounded-2xl',
           isUser
             ? 'bg-indigo-600 text-white rounded-br-md'
-            : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-bl-md'
+            : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-bl-md',
         )}
       >
         <p className="text-sm leading-relaxed break-words">{message.content}</p>
-        <p
-          className={cn(
-            'text-[10px] mt-1',
-            isUser
-              ? 'text-indigo-100'
-              : 'text-slate-500 dark:text-slate-400'
-          )}
+        <div
+          className={cn('flex items-center justify-between gap-2 mt-1', isUser && 'flex-row-reverse')}
         >
-          {timestamp}
-        </p>
+          <p
+            className={cn(
+              'text-[10px]',
+              isUser ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400',
+            )}
+          >
+            {timestamp}
+          </p>
+
+          {/* TTS button for assistant messages */}
+          {!isUser && (
+            <TtsPlayButton
+              messageId={messageId}
+              text={message.content}
+              isPlaying={isPlayingTts}
+              isLoading={isLoadingTts}
+              onPlay={onTtsPlay || (() => {})}
+              onStop={onTtsStop || (() => {})}
+              onPause={onTtsPause || (() => {})}
+              onResume={onTtsResume || (() => {})}
+              compact
+            />
+          )}
+        </div>
       </div>
     </div>
   )

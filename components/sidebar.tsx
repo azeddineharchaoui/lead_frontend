@@ -12,6 +12,7 @@ import {
   KeyRound,
   LogOut,
   ChevronDown,
+  Volume2,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { RoleGuard } from './auth/RoleGuard'
@@ -71,6 +72,15 @@ const adminItems = [
     href: '/settings/api-keys',
     icon: KeyRound,
     match: (p: string) => p.startsWith('/settings/api-keys'),
+  },
+]
+
+const settingsItems = [
+  {
+    label: 'Voix & audio',
+    href: '/settings/voice',
+    icon: Volume2,
+    match: (p: string) => p.startsWith('/settings/voice'),
   },
 ]
 
@@ -158,6 +168,28 @@ export function Sidebar() {
             )}
           </div>
         </RoleGuard>
+
+        {/* Settings Submenu */}
+        <div className="pt-4 mt-4 border-t border-slate-800 dark:border-slate-900 space-y-1">
+          {settingsItems.map((item) => {
+            const Icon = item.icon
+            const isActive = item.match(pathname)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 text-sm ${
+                  isActive
+                    ? 'bg-indigo-600/20 text-white border-l-2 border-indigo-500'
+                    : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                }`}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            )
+          })}
+        </div>
       </nav>
 
       {/* User Footer */}

@@ -9,9 +9,27 @@ interface MessageListProps {
   messages: ChatMessage[]
   isLoading?: boolean
   isSending?: boolean
+  currentTtsMessageId?: string | null
+  isTtsPlaying?: boolean
+  isTtsLoading?: boolean
+  onTtsPlay?: (messageId: string, text: string) => void
+  onTtsStop?: () => void
+  onTtsPause?: () => void
+  onTtsResume?: () => void
 }
 
-export function MessageList({ messages, isLoading, isSending }: MessageListProps) {
+export function MessageList({
+  messages,
+  isLoading,
+  isSending,
+  currentTtsMessageId,
+  isTtsPlaying,
+  isTtsLoading,
+  onTtsPlay,
+  onTtsStop,
+  onTtsPause,
+  onTtsResume,
+}: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom on new messages
@@ -69,11 +87,25 @@ export function MessageList({ messages, isLoading, isSending }: MessageListProps
           )}
 
           {/* Messages for this date */}
-          {group.messages.map((msg, msgIdx) => (
-            <div key={msgIdx} aria-live={msg.role === 'assistant' ? 'polite' : undefined}>
-              <MessageBubble message={msg} isUser={msg.role === 'user'} />
-            </div>
-          ))}
+          {group.messages.map((msg, msgIdx) => {
+            const messageId = `${idx}-${msgIdx}`
+            const isCurrentTts = currentTtsMessageId === messageId
+            return (
+              <div key={msgIdx} aria-live={msg.role === 'assistant' ? 'polite' : undefined}>
+                <MessageBubble
+                  message={msg}
+                  isUser={msg.role === 'user'}
+                  messageId={messageId}
+                  isPlayingTts={isCurrentTts && isTtsPlaying}
+                  isLoadingTts={isCurrentTts && isTtsLoading}
+                  onTtsPlay={onTtsPlay}
+                  onTtsStop={onTtsStop}
+                  onTtsPause={onTtsPause}
+                  onTtsResume={onTtsResume}
+                />
+              </div>
+            )
+          })}
         </div>
       ))}
 

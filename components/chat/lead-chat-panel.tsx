@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useChatSession } from '@/hooks/useChatSession'
+import { useTtsPlayback } from '@/hooks/useTtsPlayback'
 import { ChatComposer } from './chat-composer'
 import { MessageList } from './message-list'
 import { RagIntelligencePanel } from './rag-intelligence-panel'
 import { SessionSelector } from './session-selector'
+import { AutoReadToggle } from './auto-read-toggle'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, PanelRight } from 'lucide-react'
@@ -27,6 +29,7 @@ export function LeadChatPanel({
 }: LeadChatPanelProps) {
   const [showIntelligencePanel, setShowIntelligencePanel] = useState(false)
   const [intelligenceOpen, setIntelligenceOpen] = useState(false)
+  const [autoRead, setAutoRead] = useState(false)
 
   const {
     messages,
@@ -46,6 +49,9 @@ export function LeadChatPanel({
     onLeadStatusChange,
   })
 
+  const { isPlaying, isLoading: isTtsLoading, currentMessageId, play, stop, pause, resume } =
+    useTtsPlayback()
+
   // Show intelligence panel on desktop by default after first message
   useEffect(() => {
     if (lastResponse && !showIntelligencePanel) {
@@ -53,11 +59,25 @@ export function LeadChatPanel({
     }
   }, [lastResponse, showIntelligencePanel])
 
+  // Auto-read new assistant messages when enabled
+  useEffect(() => {
+    if (autoRead && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage.role === 'assistant' && lastMessage.content && !isPlaying) {
+        const messageId = `${messages.length - 1}`
+        play(messageId, lastMessage.content)
+      }
+    }
+  }, [autoRead, messages, isPlaying, play])
+
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
       {/* Header with session selector */}
       <div className="border-b border-slate-200 dark:border-slate-700 p-4 space-y-3">
-        <SessionSelector leadId={leadId} onLoadSession={loadSession} onNewSession={startNewSession} />
+        <div className="flex items-center justify-between gap-2">
+          <SessionSelector leadId={leadId} onLoadSession={loadSession} onNewSession={startNewSession} />
+          <AutoReadToggle enabled={autoRead} onToggle={setAutoRead} />
+        </div>
 
         {/* Desktop toggle for intelligence panel */}
         <div className="hidden lg:flex justify-end">
@@ -88,6 +108,13 @@ export function LeadChatPanel({
               messages={messages}
               isLoading={isLoading}
               isSending={isSending}
+              currentTtsMessageId={currentMessageId}
+              isTtsPlaying={isPlaying}
+              isTtsLoading={isTtsLoading}
+              onTtsPlay={play}
+              onTtsStop={stop}
+              onTtsPause={pause}
+              onTtsResume={resume}
             />
           </div>
 
