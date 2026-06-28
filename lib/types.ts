@@ -246,3 +246,17 @@ export interface MeResponse {
   user: AuthUser;
   organisation: AuthOrganisation;
 }
+
+export interface ApiKeyResponse {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  expires_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface ApiKeyCreatedResponse extends ApiKeyResponse {
+  raw_key: string;
+}
