@@ -14,8 +14,11 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Lead.ma CRM',
-  description: 'Moroccan Call-Center Lead Generation Platform',
+  title: {
+    template: '%s | Lead.ma CRM',
+    default: 'Lead.ma CRM',
+  },
+  description: 'Platform CRM moderne pour la gestion des leads et le scraping web',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -50,12 +53,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="font-sans antialiased">
+    <html lang="fr" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className="font-sans antialiased bg-slate-50 dark:bg-slate-950">
         <AuthProvider>
           <ApiProvider>
             <AppShell>{children}</AppShell>
-            <Toaster />
+            <Toaster richColors position="top-right" />
           </ApiProvider>
         </AuthProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

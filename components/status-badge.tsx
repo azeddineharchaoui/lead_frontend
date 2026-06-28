@@ -6,26 +6,22 @@ interface StatusBadgeProps {
 
 const statusConfig: Record<
   LeadStatus,
-  { bgColor: string; textColor: string; label: string }
+  { className: string; label: string }
 > = {
   nouveau: {
-    bgColor: 'bg-blue-50',
-    textColor: 'text-blue-700',
+    className: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200',
     label: 'Nouveau',
   },
   en_cours: {
-    bgColor: 'bg-amber-50',
-    textColor: 'text-amber-700',
+    className: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
     label: 'En cours',
   },
   qualifie: {
-    bgColor: 'bg-green-50',
-    textColor: 'text-green-700',
+    className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
     label: 'Qualifié',
   },
   rejete: {
-    bgColor: 'bg-gray-100',
-    textColor: 'text-gray-700',
+    className: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200',
     label: 'Rejeté',
   },
 }
@@ -34,7 +30,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   const config = statusConfig[status]
   return (
     <span
-      className={`inline-block px-2.5 py-0.5 rounded text-sm font-medium ${config.bgColor} ${config.textColor}`}
+      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${config.className}`}
     >
       {config.label}
     </span>
