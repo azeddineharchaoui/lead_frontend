@@ -88,3 +88,14 @@ export async function deleteLead(ctx: ApiOptions, leadId: string): Promise<void>
     { method: "DELETE" },
   );
 }
+
+export async function claimNextLead(
+  ctx: ApiOptions,
+  agent?: string,
+): Promise<Lead> {
+  const query = agent ? `?agent=${encodeURIComponent(agent)}` : '';
+  return apiRequest<Lead>(
+    toClientOptions(ctx),
+    `${API.leads.list}/claim-next${query}`,
+  );
+}
