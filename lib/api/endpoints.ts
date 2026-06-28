@@ -27,4 +27,7 @@ export const API = {
     scrapeNow: (id: string) => `/api/v1/targets/${id}/scrape-now`,
     leads: (id: string) => `/api/v1/targets/${id}/leads`,
   },
+  tasks: {
+    status: (id: string) => `/api/v1/tasks/${id}`,
+  },
 } as const;

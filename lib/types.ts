@@ -6,6 +6,18 @@ export type ChatChannel = "web_chat" | "whatsapp" | "sms" | "email";
 
 export type ScrapingStatus = "success" | "failed" | "pending";
 
+export type TaskState = "pending" | "started" | "success" | "failure";
+
+export interface TaskStatusResponse {
+  state: TaskState;
+  ready: boolean;
+  result: string | Record<string, unknown> | null;
+  progress?: {
+    current: number;
+    total: number;
+  } | null;
+}
+
 export interface ApiContextType {
   baseUrl: string;
   apiKey: string;
