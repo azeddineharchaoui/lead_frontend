@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import { ApiProvider } from '@/lib/api-context'
 import { AuthProvider } from '@/lib/auth-context'
 import { AppShell } from '@/components/app-shell'
+import { DevPanel } from '@/components/dev-panel'
 import './globals.css'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -59,6 +60,7 @@ export default function RootLayout({
           <ApiProvider>
             <AppShell>{children}</AppShell>
             <Toaster richColors position="top-right" />
+            <DevPanel />
           </ApiProvider>
         </AuthProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

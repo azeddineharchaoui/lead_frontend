@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useApi } from '@/lib/api-context'
-import { listLeads } from '@/lib/api'
-import { VoiceChatWidget } from '@/components/chat/VoiceChatWidget'
+import { listLeads } from '@/lib/api/leads'
+import { ChatWidget } from '@/components/chat/chat-widget'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -21,8 +21,6 @@ export default function ChatWidgetDemo() {
   const api = useApi()
   const [leadId, setLeadId] = useState('')
   const [recentLeads, setRecentLeads] = useState<Lead[]>([])
-  const [leadStatus, setLeadStatus] = useState<string | null>(null)
-  const [qualScore, setQualScore] = useState<number | null>(null)
 
   useEffect(() => {
     listLeads(api, { page: 1, page_size: 20 })
@@ -102,22 +100,22 @@ export default function ChatWidgetDemo() {
                   <p className="text-gray-600">{selectedLead.company_name}</p>
                 )}
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs text-gray-500">Statut actuel:</span>
+                  <span className="text-xs text-gray-500">Statut:</span>
                   <Badge variant="outline" className="text-xs">
-                    {leadStatus ?? selectedLead.status}
+                    {selectedLead.status}
                   </Badge>
                 </div>
-                {qualScore != null && (
+                {selectedLead.qualification_score != null && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">Score RAG:</span>
+                    <span className="text-xs text-gray-500">Qualification:</span>
                     <span
                       className={`text-xs font-bold ${
-                        qualScore >= 70 ? 'text-green-600' :
-                        qualScore >= 40 ? 'text-yellow-600' :
+                        selectedLead.qualification_score >= 70 ? 'text-green-600' :
+                        selectedLead.qualification_score >= 40 ? 'text-yellow-600' :
                         'text-red-500'
                       }`}
                     >
-                      {qualScore.toFixed(0)}/100
+                      {selectedLead.qualification_score.toFixed(0)}/100
                     </span>
                   </div>
                 )}
@@ -137,17 +135,14 @@ export default function ChatWidgetDemo() {
           </Card>
 
           {/* Chat widget */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 h-[560px]">
             {leadId ? (
-              <VoiceChatWidget
+              <ChatWidget
                 leadId={leadId}
-                onStatusChange={(status, score) => {
-                  setLeadStatus(status)
-                  setQualScore(score)
-                }}
+                organizationName="Lead.ma"
               />
             ) : (
-              <div className="h-[560px] flex items-center justify-center bg-white/5 border border-white/10 rounded-xl text-gray-400">
+              <div className="h-full flex items-center justify-center bg-white/5 border border-white/10 rounded-xl text-gray-400">
                 <p className="text-center">
                   Sélectionnez un lead pour démarrer la conversation
                 </p>
