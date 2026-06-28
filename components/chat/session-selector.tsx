@@ -16,15 +16,13 @@ import type { ChatSession } from '@/lib/types'
 
 interface SessionSelectorProps {
   leadId: string
-  selectedSessionId?: string
-  onSessionChange?: (sessionId: string | null) => void
+  onLoadSession?: (sessionId: string) => void
   onNewSession?: () => void
 }
 
 export function SessionSelector({
   leadId,
-  selectedSessionId,
-  onSessionChange,
+  onLoadSession,
   onNewSession,
 }: SessionSelectorProps) {
   const api = useApi()
@@ -63,9 +61,8 @@ export function SessionSelector({
   return (
     <div className="flex gap-2">
       <Select
-        value={selectedSessionId || ''}
         onValueChange={(value) => {
-          onSessionChange?.(value || null)
+          onLoadSession?.(value)
         }}
         disabled={isLoading || sessions.length === 0}
       >

@@ -2,27 +2,20 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/lib/api-context'
-import { updateLeadStatus } from '@/lib/api'
+import { updateLeadStatus } from '@/lib/api/leads'
 import { showApiError } from '@/lib/api-errors'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, Loader2, TrendingUp, MessageSquare, Clock } from 'lucide-react'
+import { CheckCircle, Loader2, TrendingUp, MessageSquare, Clock, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { scoreTier, scoreTierLabel, scoreTierColor, intentLabel, intentColor } from '@/lib/chat-utils'
 import type { LeadDetailResponse, LeadStatus } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
 interface QualificationPanelProps {
   lead: LeadDetailResponse
   onLeadUpdate?: (updated: Partial<LeadDetailResponse>) => void
-}
-
-const INTENT_LABELS: Record<string, { label: string; color: string }> = {
-  interet_achat:     { label: 'Intérêt achat',    color: 'bg-green-100 text-green-800' },
-  question_technique:{ label: 'Question technique', color: 'bg-blue-100 text-blue-800' },
-  indecis:           { label: 'Indécis',           color: 'bg-yellow-100 text-yellow-800' },
-  plainte:           { label: 'Plainte',           color: 'bg-orange-100 text-orange-800' },
-  refus:             { label: 'Refus',             color: 'bg-red-100 text-red-800' },
-  salutation:        { label: 'Salutation',        color: 'bg-gray-100 text-gray-700' },
-  inconnu:           { label: 'Inconnu',           color: 'bg-gray-100 text-gray-500' },
+  onOpenChat?: () => void
 }
 
 /**
@@ -31,14 +24,15 @@ const INTENT_LABELS: Record<string, { label: string; color: string }> = {
  */
 function ScoreGauge({ score }: { score: number }) {
   const clampedScore = Math.max(0, Math.min(100, score))
+  const tier = scoreTier(clampedScore)
   const radius = 44
   const circumference = Math.PI * radius // demi-cercle
   const dashOffset = circumference - (clampedScore / 100) * circumference
 
   const color =
-    clampedScore >= 70 ? '#22c55e' :
-    clampedScore >= 40 ? '#f59e0b' :
-                         '#ef4444'
+    tier === 'high' ? '#22c55e' :
+    tier === 'mid' ? '#f59e0b' :
+                      '#ef4444'
 
   return (
     <div className="flex flex-col items-center">
@@ -76,11 +70,13 @@ function ScoreGauge({ score }: { score: number }) {
  * Panneau de qualification numérique d'un lead.
  * Affiche le score RAG, l'intention, les sessions et les actions rapides.
  */
-export function QualificationPanel({ lead, onLeadUpdate }: QualificationPanelProps) {
+export function QualificationPanel({ lead, onLeadUpdate, onOpenChat }: QualificationPanelProps) {
   const api = useApi()
   const [qualifying, setQualifying] = useState(false)
 
   const score = lead.qualification_score ?? null
+  const tier = scoreTier(score)
+  const tierLabel = scoreTierLabel(tier)
   const sessionCount = lead.chat_sessions?.length ?? 0
 
   // Intention la plus récente depuis les sessions
@@ -90,7 +86,7 @@ export function QualificationPanel({ lead, onLeadUpdate }: QualificationPanelPro
     .find((s) => s.intent_detected)
     ?.intent_detected ?? null
 
-  const intentInfo = latestIntent ? INTENT_LABELS[latestIntent] : null
+  const latestIntentLabel = intentLabel(latestIntent)
 
   const handleQualify = async () => {
     setQualifying(true)
@@ -116,23 +112,23 @@ export function QualificationPanel({ lead, onLeadUpdate }: QualificationPanelPro
       {score != null ? (
         <div className="flex flex-col items-center py-2">
           <ScoreGauge score={score} />
-          <p className="text-xs text-gray-500 mt-1">
-            {score >= 70 ? 'Lead qualifié 🎯' : score >= 40 ? 'Lead prometteur' : 'Lead froid'}
+          <p className={cn('text-xs mt-1', scoreTierColor(tier))}>
+            {tierLabel}
           </p>
         </div>
       ) : (
-        <div className="text-center py-4 text-gray-400 text-sm">
+        <div className="text-center py-4 text-slate-400 text-sm">
           Aucun score — démarrez une conversation pour qualifier ce lead
         </div>
       )}
 
       {/* Intention */}
-      {intentInfo && (
+      {latestIntent && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-600">Dernière intention</span>
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${intentInfo.color}`}>
-            {intentInfo.label}
-          </span>
+          <span className="text-xs text-slate-600 dark:text-slate-400">Dernière intention</span>
+          <Badge variant="secondary" className="text-xs">
+            {latestIntentLabel}
+          </Badge>
         </div>
       )}
 
@@ -158,26 +154,37 @@ export function QualificationPanel({ lead, onLeadUpdate }: QualificationPanelPro
         </div>
       )}
 
+      {/* Action : Ouvrir le chat */}
+      <Button
+        onClick={onOpenChat}
+        variant="outline"
+        size="sm"
+        className="w-full gap-2"
+      >
+        <MessageCircle className="w-4 h-4" />
+        Ouvrir le chat
+      </Button>
+
       {/* Action : Envoyer au call center */}
       {lead.status !== 'qualifie' && lead.status !== 'rejete' && (
         <Button
           onClick={handleQualify}
           disabled={qualifying}
           size="sm"
-          className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white"
+          className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
         >
           {qualifying ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <CheckCircle className="w-4 h-4" />
           )}
-          Envoyer au call center
+          Qualifier
         </Button>
       )}
 
       {lead.status === 'qualifie' && (
-        <div className="text-center text-xs text-green-700 bg-green-50 rounded py-2 font-medium">
-          ✓ Lead déjà qualifié et envoyé au call center
+        <div className="text-center text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 rounded py-2 font-medium">
+          ✓ Lead qualifié et envoyé au call center
         </div>
       )}
     </div>

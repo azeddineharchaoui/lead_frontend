@@ -42,6 +42,7 @@ export default function LeadDetailPage() {
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
   const [isNoteSaving, setIsNoteSaving] = useState(false)
   const [notesSaveTimeout, setNotesSaveTimeout] = useState<NodeJS.Timeout | null>(null)
+  const [activeTab, setActiveTab] = useState('overview')
 
   const loadLead = useCallback(async () => {
     try {
@@ -373,12 +374,13 @@ export default function LeadDetailPage() {
           <QualificationPanel
             lead={lead}
             onLeadUpdate={(updates) => setLead((prev) => prev ? { ...prev, ...updates } : prev)}
+            onOpenChat={() => setActiveTab('chat')}
           />
         </div>
 
         {/* MAIN CONTENT */}
         <div className="lg:col-span-3">
-          <Tabs defaultValue="overview" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="overview">Aperçu</TabsTrigger>
               <TabsTrigger value="history" className="gap-1">
