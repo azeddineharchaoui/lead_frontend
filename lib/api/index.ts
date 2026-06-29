@@ -6,3 +6,5 @@ export * from "./leads";
 export * from "./chat";
 export * from "./targets";
 export * from "./org";
+export * from "./auth";
+export * from "./tasks";
