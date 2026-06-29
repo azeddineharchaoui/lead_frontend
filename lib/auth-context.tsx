@@ -8,7 +8,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { AuthOrganisation, AuthUser, LoginPayload, RegisterPayload } from './types'
-import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister, refreshTokens } from './api/auth'
+import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister, refreshTokens, updateProfile, changePassword } from './api/auth'
 import {
   DEV_MOCK_ACCESS_TOKEN,
   DEV_MOCK_ORG,
@@ -27,6 +27,9 @@ interface AuthContextValue {
   register: (payload: RegisterPayload) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
+  refreshSession: () => Promise<string | null>
+  updateProfile: (full_name: string) => Promise<void>
+  changePassword: (current_password: string, new_password: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -121,6 +124,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [accessToken, logout])
 
+  // ── Refresh session (get new token) ──────────────────────────────────────
+  const refreshSession = useCallback(async (): Promise<string | null> => {
+    try {
+      const tokens = await refreshTokens()
+      setAccessToken(tokens.access_token)
+      return tokens.access_token
+    } catch {
+      setAccessToken(null)
+      return null
+    }
+  }, [])
+
+  // ── Update profile ──────────────────────────────────────────────────────
+  const updateProfileFn = useCallback(async (full_name: string) => {
+    if (!accessToken) throw new Error('Not authenticated')
+    await updateProfile(full_name, accessToken)
+    await refreshUser()
+  }, [accessToken, refreshUser])
+
+  // ── Change password ────────────────────────────────────────────────────
+  const changePasswordFn = useCallback(async (current_password: string, new_password: string) => {
+    if (!accessToken) throw new Error('Not authenticated')
+    await changePassword(current_password, new_password, accessToken)
+  }, [accessToken])
+
   return (
     <AuthContext.Provider
       value={{
@@ -134,6 +162,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         refreshUser,
+        refreshSession,
+        updateProfile: updateProfileFn,
+        changePassword: changePasswordFn,
       }}
     >
       {children}

@@ -7,6 +7,7 @@ import { useApiClient } from '@/hooks/useApiClient'
 import { fetchHealth } from '@/lib/api'
 import { isApiHealthy } from '@/lib/types'
 import { useAuth } from '@/hooks/useAuth'
+import { UserMenu } from '@/components/user-menu'
 import {
   AlertCircle,
   CheckCircle2,
@@ -15,20 +16,16 @@ import {
   Moon,
   Sun,
   Bell,
-  LogOut,
-  Settings,
   ChevronRight,
 } from 'lucide-react'
-import { useState as useStateTheme } from 'react'
 
 export function Header() {
   const pathname = usePathname()
   const { baseUrl, apiKey } = useApiClient()
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const [healthy, setHealthy] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [darkMode, setDarkMode] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   // Initialize dark mode from localStorage
   useEffect(() => {
@@ -170,47 +167,7 @@ export function Header() {
           </button>
 
           {/* User menu */}
-          <div className="relative">
-            <button
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-            >
-              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-sm font-bold text-white">
-                {user?.full_name.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-200 hidden sm:inline">
-                {user?.full_name}
-              </span>
-            </button>
-
-            {/* User dropdown menu */}
-            {userMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-lg border border-slate-200 dark:border-slate-800 py-1 z-50">
-                <div className="px-4 py-2 border-b border-slate-200 dark:border-slate-800">
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">{user?.full_name}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{user?.email}</p>
-                </div>
-                <Link
-                  href="/settings"
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  onClick={() => setUserMenuOpen(false)}
-                >
-                  <Settings className="w-4 h-4" />
-                  Paramètres
-                </Link>
-                <button
-                  onClick={() => {
-                    signOut()
-                    setUserMenuOpen(false)
-                  }}
-                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-700 dark:text-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Déconnexion
-                </button>
-              </div>
-            )}
-          </div>
+          {user && <UserMenu />}
         </div>
       </div>
 

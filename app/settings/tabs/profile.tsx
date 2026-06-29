@@ -6,27 +6,61 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
+import { Loader2, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function ProfileTab() {
-  const { user } = useAuth()
-  const [loading, setLoading] = useState(false)
+  const { user, updateProfile: updateProfileFn, changePassword: changePasswordFn } = useAuth()
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [passwordLoading, setPasswordLoading] = useState(false)
   const [fullName, setFullName] = useState(user?.full_name || '')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
 
   const handleSaveProfile = async () => {
     if (!fullName.trim()) {
       toast.error('Le nom complet ne peut pas être vide')
       return
     }
-    setLoading(true)
+    setProfileLoading(true)
     try {
-      // TODO: Implement PATCH /auth/me
-      toast.success('Profil mis à jour')
+      await updateProfileFn(fullName)
+      toast.success('Profil mis à jour avec succès')
     } catch (err: any) {
       toast.error(err.message || 'Erreur lors de la mise à jour')
     } finally {
-      setLoading(false)
+      setProfileLoading(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error('Tous les champs sont obligatoires')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Les nouveaux mots de passe ne correspondent pas')
+      return
+    }
+
+    if (newPassword.length < 8) {
+      toast.error('Le mot de passe doit contenir au moins 8 caractères')
+      return
+    }
+
+    setPasswordLoading(true)
+    try {
+      await changePasswordFn(currentPassword, newPassword)
+      toast.success('Mot de passe modifié avec succès')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur lors de la modification du mot de passe')
+    } finally {
+      setPasswordLoading(false)
     }
   }
 
@@ -96,8 +130,8 @@ export default function ProfileTab() {
             />
           </div>
 
-          <Button onClick={handleSaveProfile} disabled={loading} className="w-full">
-            {loading ? (
+          <Button onClick={handleSaveProfile} disabled={profileLoading} className="w-full">
+            {profileLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Sauvegarde...
@@ -122,6 +156,9 @@ export default function ProfileTab() {
               id="currentPassword"
               type="password"
               placeholder="••••••••"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              disabled={passwordLoading}
               className="w-full"
             />
           </div>
@@ -132,6 +169,9 @@ export default function ProfileTab() {
               id="newPassword"
               type="password"
               placeholder="••••••••"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              disabled={passwordLoading}
               className="w-full"
             />
           </div>
@@ -142,16 +182,23 @@ export default function ProfileTab() {
               id="confirmPassword"
               type="password"
               placeholder="••••••••"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              disabled={passwordLoading}
               className="w-full"
             />
           </div>
 
-          <Button variant="outline" className="w-full" disabled>
-            Modifier le mot de passe
+          <Button onClick={handleChangePassword} className="w-full" disabled={passwordLoading}>
+            {passwordLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Modification...
+              </>
+            ) : (
+              'Modifier le mot de passe'
+            )}
           </Button>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Cette fonctionnalité sera bientôt disponible.
-          </p>
         </CardContent>
       </Card>
     </div>

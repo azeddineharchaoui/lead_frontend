@@ -127,3 +127,19 @@ export async function resetPassword(token: string, newPassword: string): Promise
     body: JSON.stringify({ token, new_password: newPassword }),
   });
 }
+
+/** Update user profile (full_name) */
+export async function updateProfile(full_name: string, accessToken: string): Promise<AuthUser> {
+  return backendFetch<AuthUser>("/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify({ full_name }),
+  }, accessToken);
+}
+
+/** Change password */
+export async function changePassword(current_password: string, new_password: string, accessToken: string): Promise<void> {
+  return backendFetch("/auth/me/password", {
+    method: "PATCH",
+    body: JSON.stringify({ current_password, new_password }),
+  }, accessToken);
+}

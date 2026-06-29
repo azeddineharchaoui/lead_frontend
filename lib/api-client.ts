@@ -50,6 +50,41 @@ export async function apiRequest<T>(
   return body as T
 }
 
+/**
+ * Make an API request with automatic 401 refresh retry.
+ * This wrapper calls the auth context's refreshSession() if a 401 occurs,
+ * then retries the request once with the new token.
+ */
+export async function apiRequestWithRetry<T>(
+  options: ApiClientOptions,
+  path: string,
+  init: RequestInit = {},
+  onRefresh?: () => Promise<string | null>, // Callback to refresh token (e.g., from useAuth context)
+): Promise<T> {
+  try {
+    return await apiRequest<T>(options, path, init)
+  } catch (error) {
+    // If 401 and we have a refresh callback, try to refresh and retry once
+    if (
+      error instanceof Error &&
+      (error as Error & { status?: number }).status === 401 &&
+      options.accessToken &&
+      onRefresh
+    ) {
+      const newToken = await onRefresh()
+      if (newToken) {
+        // Retry with new token
+        const newOptions = { ...options, accessToken: newToken }
+        return apiRequest<T>(newOptions, path, init)
+      } else {
+        // Refresh failed, redirect to login will be handled by auth context
+        throw error
+      }
+    }
+    throw error
+  }
+}
+
 export function normalizeApiError(status: number, body: any): Error {
   let message = `Request failed (${status})`
   let code = 'request_failed'
