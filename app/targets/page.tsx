@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useApiClient } from '@/hooks/useApiClient'
-import { listTargets } from '@/lib/api/targets'
+import { listTargets, getStatsOverview } from '@/lib/api/targets'
 import { showApiError } from '@/lib/api-errors'
-import type { ScrapingTarget, ScrapingStatus } from '@/lib/types'
+import type { ScrapingTarget, ScrapingStatus, StatsOverviewResponse } from '@/lib/types'
 import { PageHeader } from '@/components/page-header'
 import { AddTargetDialog } from '@/components/targets/add-target-dialog'
 import { TargetCard } from '@/components/targets/target-card'
 import { TargetDetailSheet } from '@/components/target-detail-sheet'
 import { TargetStatusBadge } from '@/components/targets/target-status-badge'
+import { ImportDomainsDialog } from '@/components/targets/import-domains-dialog'
+import { ScrapingStatsCards } from '@/components/targets/scraping-stats-cards'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -20,16 +22,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { AlertCircle, Plus, Grid, Table, Loader2 } from 'lucide-react'
+import { AlertCircle, Plus, Grid, Table, Loader2, Upload } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 
 export default function TargetsPage() {
   const api = useApiClient()
   const [targets, setTargets] = useState<ScrapingTarget[]>([])
+  const [stats, setStats] = useState<StatsOverviewResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [selectedTarget, setSelectedTarget] = useState<ScrapingTarget | null>(null)
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
@@ -42,8 +46,12 @@ export default function TargetsPage() {
     try {
       setLoading(true)
       setError(null)
-      const data = await listTargets(api, { page: 1, page_size: 100 })
+      const [data, statsData] = await Promise.all([
+        listTargets(api, { page: 1, page_size: 100 }),
+        getStatsOverview(api),
+      ])
       setTargets(data.items)
+      setStats(statsData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement')
       showApiError(err)
@@ -110,11 +118,20 @@ export default function TargetsPage() {
           title="Cibles de scraping"
           description={`${activeCount} active${activeCount !== 1 ? 's' : ''} / ${targets.length} total`}
         />
-        <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Ajouter
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setIsImportDialogOpen(true)} variant="outline" className="gap-2">
+            <Upload className="w-4 h-4" />
+            Importer
+          </Button>
+          <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Ajouter
+          </Button>
+        </div>
       </div>
+
+      {/* Stats Cards */}
+      {stats && <ScrapingStatsCards stats={stats} />}
 
       {error && (
         <Alert variant="destructive">
@@ -290,6 +307,15 @@ export default function TargetsPage() {
         onTargetCreated={(target) => {
           setTargets((prev) => [target, ...prev])
           toast.success('Cible créée avec succès')
+        }}
+      />
+
+      <ImportDomainsDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
+        onSuccess={() => {
+          loadTargets()
+          toast.success('Import démarré')
         }}
       />
 

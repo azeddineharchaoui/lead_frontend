@@ -146,3 +146,46 @@ export async function listTargetLeads(
     ADMIN,
   );
 }
+
+export interface ImportTargetsResponse {
+  task_id: string;
+  message: string;
+  domains_count: number;
+}
+
+export async function importTargets(
+  ctx: ApiOptions,
+  file: File,
+): Promise<ImportTargetsResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers = new Headers();
+  const clientOpts = toClientOptions(ctx);
+
+  // Apply auth headers but let the browser set Content-Type for FormData
+  if (clientOpts.accessToken) {
+    headers.set("Authorization", `Bearer ${clientOpts.accessToken}`);
+  } else if (clientOpts.apiKey) {
+    headers.set("X-API-Key", clientOpts.apiKey);
+  }
+
+  const baseUrl = clientOpts.baseUrl || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  
+  const response = await fetch(`${baseUrl}/api/v1/targets/import`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const message =
+      typeof body?.detail === "string"
+        ? body.detail
+        : body?.detail?.message || `Request failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  return response.json() as Promise<ImportTargetsResponse>;
+}
