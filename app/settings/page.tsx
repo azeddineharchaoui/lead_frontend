@@ -11,6 +11,8 @@ import { AlertCircle, User, Building2, Users, KeyRound, Shield, Plug } from 'luc
 import { toast } from 'sonner'
 import ProfileTab from './tabs/profile'
 import OrganisationTab from './tabs/organisation'
+import TeamTab from './tabs/team'
+import ApiKeysTab from './tabs/api-keys'
 import ApiConnectionTab from './tabs/api-connection'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 
@@ -103,20 +105,14 @@ export default function SettingsPage() {
         {/* Team tab */}
         <RoleGuard roles={['owner', 'admin']}>
           <TabsContent value="team" className="mt-6 space-y-6">
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-8 text-center">
-              <Users className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-300">Team management coming soon</h3>
-            </div>
+            <TeamTab />
           </TabsContent>
         </RoleGuard>
 
         {/* API Keys tab */}
         <RoleGuard roles={['owner', 'admin']}>
           <TabsContent value="api-keys" className="mt-6 space-y-6">
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-8 text-center">
-              <KeyRound className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-300">API keys management coming soon</h3>
-            </div>
+            <ApiKeysTab />
           </TabsContent>
         </RoleGuard>
 

@@ -10,127 +10,77 @@ import type {
   AuthUser,
   UserRole,
 } from '@/lib/types'
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
-export interface ApiOptions {
-  baseUrl?: string
-  apiKey?: string
-  accessToken?: string
-}
-
-// Internal helper
-async function backendFetch<T>(
-  path: string,
-  init: RequestInit = {},
-  accessToken?: string | null,
-): Promise<T> {
-  const headers = new Headers(init.headers)
-  headers.set('Content-Type', 'application/json')
-  headers.set('Accept', 'application/json')
-  if (accessToken) {
-    headers.set('Authorization', `Bearer ${accessToken}`)
-  }
-
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers })
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    const message =
-      typeof body?.detail === 'string'
-        ? body.detail
-        : body?.detail?.message || `Request failed (${res.status})`
-    throw new Error(message)
-  }
-  if (res.status === 204) return undefined as unknown as T
-  return res.json() as Promise<T>
-}
+import { apiRequest, type ApiClientOptions } from '@/lib/api-client'
 
 // ─────────────────────────────────────────────────────────────────────────
 // Organisation
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function getOrg(accessToken: string): Promise<AuthOrganisation> {
-  return backendFetch<AuthOrganisation>('/api/v1/org', { method: 'GET' }, accessToken)
+export async function getOrg(options: ApiClientOptions): Promise<AuthOrganisation> {
+  return apiRequest<AuthOrganisation>(options, '/api/v1/org', { method: 'GET' })
 }
 
 export async function updateOrg(
-  accessToken: string,
-  data: Partial<{ name: string; settings: object }>,
+  options: ApiClientOptions,
+  data: Partial<{ name: string; timezone?: string; webhook_url?: string }>,
 ): Promise<AuthOrganisation> {
-  return backendFetch<AuthOrganisation>(
-    '/api/v1/org',
-    {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    },
-    accessToken,
-  )
+  return apiRequest<AuthOrganisation>(options, '/api/v1/org', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
 }
 
 // ─────────────────────────────────────────────────────────────────────────
 // Team Members
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function listMembers(accessToken: string): Promise<AuthUser[]> {
-  return backendFetch<AuthUser[]>('/api/v1/org/members', { method: 'GET' }, accessToken)
+export async function listMembers(options: ApiClientOptions): Promise<AuthUser[]> {
+  return apiRequest<AuthUser[]>(options, '/api/v1/org/members', { method: 'GET' })
 }
 
 export async function inviteMember(
-  accessToken: string,
+  options: ApiClientOptions,
   payload: { email: string; full_name: string; role: UserRole },
 ): Promise<AuthUser> {
-  return backendFetch<AuthUser>(
-    '/api/v1/org/invite',
-    {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    },
-    accessToken,
-  )
+  return apiRequest<AuthUser>(options, '/api/v1/org/invite', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
 }
 
-export async function removeMember(accessToken: string, userId: string): Promise<void> {
-  return backendFetch('/api/v1/org/members/' + userId, { method: 'DELETE' }, accessToken)
+export async function removeMember(options: ApiClientOptions, userId: string): Promise<void> {
+  return apiRequest(options, `/api/v1/org/members/${userId}`, { method: 'DELETE' })
 }
 
 export async function updateMemberRole(
-  accessToken: string,
+  options: ApiClientOptions,
   userId: string,
   role: UserRole,
 ): Promise<AuthUser> {
-  return backendFetch<AuthUser>(
-    `/api/v1/org/members/${userId}/role`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({ role }),
-    },
-    accessToken,
-  )
+  return apiRequest<AuthUser>(options, `/api/v1/org/members/${userId}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  })
 }
 
 // ─────────────────────────────────────────────────────────────────────────
 // API Keys
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function listApiKeys(accessToken: string): Promise<ApiKeyResponse[]> {
-  return backendFetch<ApiKeyResponse[]>('/api/v1/org/api-keys', { method: 'GET' }, accessToken)
+export async function listApiKeys(options: ApiClientOptions): Promise<ApiKeyResponse[]> {
+  return apiRequest<ApiKeyResponse[]>(options, '/api/v1/org/api-keys', { method: 'GET' })
 }
 
 export async function createApiKey(
-  accessToken: string,
+  options: ApiClientOptions,
   payload: { name: string; scopes: string[] },
 ): Promise<ApiKeyCreatedResponse> {
-  return backendFetch<ApiKeyCreatedResponse>(
-    '/api/v1/org/api-keys',
-    {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    },
-    accessToken,
-  )
+  return apiRequest<ApiKeyCreatedResponse>(options, '/api/v1/org/api-keys', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
 }
 
-export async function revokeApiKey(accessToken: string, keyId: string): Promise<void> {
-  return backendFetch('/api/v1/org/api-keys/' + keyId, { method: 'DELETE' }, accessToken)
+export async function revokeApiKey(options: ApiClientOptions, keyId: string): Promise<void> {
+  return apiRequest(options, `/api/v1/org/api-keys/${keyId}`, { method: 'DELETE' })
 }

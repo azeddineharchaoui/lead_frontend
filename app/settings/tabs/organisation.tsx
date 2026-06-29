@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { useOrg } from '@/hooks/useOrg'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,28 +19,41 @@ import { toast } from 'sonner'
 
 export default function OrganisationTab() {
   const { organisation } = useAuth()
-  const [loading, setLoading] = useState(false)
-  const [orgName, setOrgName] = useState(organisation?.name || '')
-  const [timezone, setTimezone] = useState(
-    (organisation?.settings as any)?.timezone || 'Africa/Casablanca',
-  )
-  const [webhookUrl, setWebhookUrl] = useState(
-    (organisation?.settings as any)?.webhook_url || '',
-  )
+  const { org, loading, fetchOrg, updateOrgDetails } = useOrg()
+  
+  const [orgName, setOrgName] = useState('')
+  const [timezone, setTimezone] = useState('Africa/Casablanca')
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  // Load org data on mount
+  useEffect(() => {
+    fetchOrg()
+  }, [fetchOrg])
+
+  // Update form when org data changes
+  useEffect(() => {
+    if (org) {
+      setOrgName(org.name || '')
+      setTimezone((org.settings as any)?.timezone || 'Africa/Casablanca')
+      setWebhookUrl((org.settings as any)?.webhook_url || '')
+    }
+  }, [org])
 
   const handleSaveOrg = async () => {
     if (!orgName.trim()) {
       toast.error('Le nom de l\'organisation ne peut pas être vide')
       return
     }
-    setLoading(true)
+    setSaving(true)
     try {
-      // TODO: Implement PATCH /api/v1/org
-      toast.success('Organisation mise à jour')
-    } catch (err: any) {
-      toast.error(err.message || 'Erreur lors de la mise à jour')
+      await updateOrgDetails({
+        name: orgName,
+        timezone,
+        webhook_url: webhookUrl,
+      })
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
@@ -87,8 +101,8 @@ export default function OrganisationTab() {
             </Select>
           </div>
 
-          <Button onClick={handleSaveOrg} disabled={loading} className="w-full">
-            {loading ? (
+          <Button onClick={handleSaveOrg} disabled={saving || loading} className="w-full">
+            {saving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Sauvegarde...
