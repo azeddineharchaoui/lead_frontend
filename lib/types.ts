@@ -79,6 +79,11 @@ export interface LeadDetailResponse extends Lead {
   chat_sessions: LeadSessionSummary[];
 }
 
+export interface CrmPushResponse {
+  task_id: string;
+  message: string;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;

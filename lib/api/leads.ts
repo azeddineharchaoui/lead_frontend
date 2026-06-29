@@ -8,6 +8,7 @@ import type {
   LeadUpdate,
   HistoryEntry,
   PaginatedResponse,
+  CrmPushResponse,
 } from "@/lib/types";
 import { API } from "./endpoints";
 import { toClientOptions, type ApiOptions } from "./client-options";
@@ -135,6 +136,17 @@ export async function assignLead(
   return apiRequest<Lead>(
     toClientOptions(ctx),
     `${API.leads.assign(leadId)}?${query.toString()}`,
+    { method: "POST" },
+  );
+}
+
+export async function retryCrmPush(
+  ctx: ApiOptions,
+  leadId: string,
+): Promise<CrmPushResponse> {
+  return apiRequest<CrmPushResponse>(
+    toClientOptions(ctx),
+    `${API.leads.detail(leadId)}/retry-crm-push`,
     { method: "POST" },
   );
 }

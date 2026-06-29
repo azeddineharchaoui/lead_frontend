@@ -101,7 +101,7 @@ function DashboardContent() {
       {(isAdmin || isOwner) && (
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="outline" className="gap-2">
-            <Link href="/leads/new">
+            <Link href="/leads?create=1">
               <UserPlus className="w-4 h-4" />
               Nouveau lead
             </Link>

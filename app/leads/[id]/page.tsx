@@ -3,16 +3,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useApiClient } from '@/hooks/useApiClient'
-import { getLead, updateLeadStatus, deleteLead, updateLead, assignLead } from '@/lib/api'
+import { getLead, updateLeadStatus, deleteLead, updateLead, assignLead, retryCrmPush } from '@/lib/api'
 import { listChatSessions, getChatSession, closeChatSession } from '@/lib/api'
 import { showApiError } from '@/lib/api-errors'
 import type { LeadDetailResponse, ChatSession, LeadStatus } from '@/lib/types'
 import { PageHeader } from '@/components/page-header'
 import { StatusTransitionSelect } from '@/components/leads/status-transition-select'
 import { StatusHistoryTimeline } from '@/components/leads/status-history-timeline'
-import { CrmDeliveryBadge } from '@/components/leads/crm-delivery-badge'
+import { CrmDeliveryCard } from '@/components/leads/crm-delivery-card'
+import { CrmTab } from '@/components/leads/crm-tab'
 import { AssignLeadDialog } from '@/components/leads/assign-lead-dialog'
 import { QualificationPanel } from '@/components/leads/QualificationPanel'
+import { LeadChatPanel } from '@/components/chat/lead-chat-panel'
+import { SessionSidebar } from '@/components/chat/session-sidebar'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -43,6 +46,7 @@ export default function LeadDetailPage() {
   const [isNoteSaving, setIsNoteSaving] = useState(false)
   const [notesSaveTimeout, setNotesSaveTimeout] = useState<NodeJS.Timeout | null>(null)
   const [activeTab, setActiveTab] = useState('overview')
+  const [isRetryingCrm, setIsRetryingCrm] = useState(false)
 
   const loadLead = useCallback(async () => {
     try {
@@ -175,6 +179,21 @@ export default function LeadDetailPage() {
       setSelectedSession(null)
     } catch (err) {
       showApiError(err)
+    }
+  }
+
+  const handleRetryCrmPush = async () => {
+    if (!lead) return
+    try {
+      setIsRetryingCrm(true)
+      await retryCrmPush(api, lead.id)
+      toast.success('Envoi CRM en attente')
+      // Refresh lead to get updated status
+      await loadLead()
+    } catch (err) {
+      showApiError(err)
+    } finally {
+      setIsRetryingCrm(false)
     }
   }
 
@@ -339,16 +358,12 @@ export default function LeadDetailPage() {
             </div>
           </Card>
 
-          {/* CRM status */}
-          {(lead.crm_pushed_at || lead.crm_last_error || lead.crm_push_attempts) && (
-            <Card className="p-4">
-              <CrmDeliveryBadge
-                crm_pushed_at={lead.crm_pushed_at}
-                crm_last_error={lead.crm_last_error}
-                crm_push_attempts={lead.crm_push_attempts}
-              />
-            </Card>
-          )}
+          {/* CRM status card */}
+          <CrmDeliveryCard
+            lead={lead}
+            onRetry={handleRetryCrmPush}
+            isRetrying={isRetryingCrm}
+          />
 
           {/* Qualification score */}
           {lead.qualification_score !== undefined && (
@@ -381,8 +396,8 @@ export default function LeadDetailPage() {
         {/* MAIN CONTENT */}
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="overview">Aperçu</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="overview">Fiche</TabsTrigger>
               <TabsTrigger value="history" className="gap-1">
                 <History className="w-4 h-4" />
                 <span className="hidden sm:inline">Historique</span>
@@ -391,6 +406,7 @@ export default function LeadDetailPage() {
                 <MessageSquare className="w-4 h-4" />
                 <span className="hidden sm:inline">Chat</span>
               </TabsTrigger>
+              <TabsTrigger value="crm">CRM</TabsTrigger>
             </TabsList>
 
             {/* OVERVIEW TAB */}
@@ -430,95 +446,46 @@ export default function LeadDetailPage() {
 
             {/* CHAT TAB */}
             <TabsContent value="chat" className="mt-4">
-              <Card className="p-4 space-y-4 min-h-[400px] flex flex-col">
-                {sessionSummaries.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center text-slate-500 dark:text-slate-400">
-                    <p>Aucune conversation pour ce lead</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Sélectionner une conversation
-                      </label>
-                      {selectedSessionId && selectedSession?.is_active && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                          onClick={handleCloseSession}
-                        >
-                          <Lock className="w-4 h-4" />
-                          Clôturer
-                        </Button>
-                      )}
+              <div className="flex h-[600px] border rounded-lg overflow-hidden bg-white dark:bg-slate-900">
+                <SessionSidebar
+                  sessions={lead.chat_sessions}
+                  activeId={selectedSessionId || undefined}
+                  onSelect={setSelectedSessionId}
+                  onNew={() => {
+                    setSelectedSessionId(null)
+                    setSelectedSession(null)
+                    loadLead()
+                  }}
+                  onClose={handleCloseSession}
+                  isLoading={sessionLoading}
+                />
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {selectedSessionId && lead.chat_sessions.length > 0 ? (
+                    <LeadChatPanel
+                      leadId={lead.id}
+                      canSendMessage={true}
+                      onLeadStatusChange={(status, score) => {
+                        loadLead()
+                        toast.success(`Statut changé: ${status}`)
+                      }}
+                      channel="web_chat"
+                    />
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                      <p>Sélectionnez une session pour commencer</p>
                     </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
 
-                    <select
-                      value={selectedSessionId || ''}
-                      onChange={(e) => setSelectedSessionId(e.target.value)}
-                      className="px-3 py-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
-                    >
-                      <option value="">Choisir...</option>
-                      {sessionSummaries.map((session) => (
-                        <option key={session.id} value={session.id}>
-                          {new Date(session.created_at).toLocaleDateString('fr-FR')} —{' '}
-                          {new Date(session.created_at).toLocaleTimeString('fr-FR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                          {session.is_active ? ' (active)' : ''}
-                        </option>
-                      ))}
-                    </select>
-
-                    {sessionLoading ? (
-                      <div className="flex-1 flex justify-center items-center">
-                        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                      </div>
-                    ) : selectedSession ? (
-                      <>
-                        {selectedSession.intent_detected && (
-                          <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
-                            <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
-                              Intention détectée: {selectedSession.intent_detected}
-                            </p>
-                            {selectedSession.intent_confidence != null && (
-                              <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
-                                Confiance: {(selectedSession.intent_confidence * 100).toFixed(0)}%
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        <div className="flex-1 overflow-y-auto space-y-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded border border-slate-200 dark:border-slate-700">
-                          {selectedSession.chat_history.map((msg, idx) => (
-                            <div
-                              key={idx}
-                              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                            >
-                              <div
-                                className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
-                                  msg.role === 'user'
-                                    ? 'bg-indigo-600 text-white rounded-br-none'
-                                    : 'bg-slate-300 dark:bg-slate-600 text-slate-900 dark:text-white rounded-bl-none'
-                                }`}
-                              >
-                                <p>{msg.content}</p>
-                                <p className="text-xs opacity-60 mt-0.5">
-                                  {new Date(msg.timestamp).toLocaleTimeString('fr-FR', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    ) : null}
-                  </>
-                )}
-              </Card>
+            {/* CRM TAB */}
+            <TabsContent value="crm" className="mt-4">
+              <CrmTab
+                lead={lead}
+                onRetry={handleRetryCrmPush}
+                isRetrying={isRetryingCrm}
+              />
             </TabsContent>
           </Tabs>
         </div>
