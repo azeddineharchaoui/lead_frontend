@@ -5,6 +5,8 @@ import type {
   LeadDetailResponse,
   LeadStatus,
   LeadStatusUpdate,
+  LeadUpdate,
+  HistoryEntry,
   PaginatedResponse,
 } from "@/lib/types";
 import { API } from "./endpoints";
@@ -86,5 +88,53 @@ export async function deleteLead(ctx: ApiOptions, leadId: string): Promise<void>
     toClientOptions(ctx),
     API.leads.detail(leadId),
     { method: "DELETE" },
+  );
+}
+
+export async function claimNextLead(
+  ctx: ApiOptions,
+  agent?: string,
+): Promise<Lead> {
+  const query = agent ? `?agent=${encodeURIComponent(agent)}` : '';
+  return apiRequest<Lead>(
+    toClientOptions(ctx),
+    `${API.leads.list}/claim-next${query}`,
+  );
+}
+
+export async function getLeadHistory(
+  ctx: ApiOptions,
+  leadId: string,
+): Promise<HistoryEntry[]> {
+  return apiRequest<HistoryEntry[]>(
+    toClientOptions(ctx),
+    API.leads.history(leadId),
+  );
+}
+
+export async function updateLead(
+  ctx: ApiOptions,
+  leadId: string,
+  data: Partial<LeadUpdate>,
+): Promise<Lead> {
+  return apiRequest<Lead>(
+    toClientOptions(ctx),
+    API.leads.detail(leadId),
+    { method: "PATCH", body: JSON.stringify(data) },
+  );
+}
+
+export async function assignLead(
+  ctx: ApiOptions,
+  leadId: string,
+  agent: string,
+  notes?: string,
+): Promise<Lead> {
+  const query = new URLSearchParams({ agent });
+  if (notes) query.append("notes", notes);
+  return apiRequest<Lead>(
+    toClientOptions(ctx),
+    `${API.leads.assign(leadId)}?${query.toString()}`,
+    { method: "POST" },
   );
 }

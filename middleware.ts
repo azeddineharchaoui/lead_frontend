@@ -20,6 +20,10 @@ const PUBLIC_PATHS = [
 const BYPASS_PREFIXES = ['/_next/', '/api/', '/favicon', '/icon', '/apple-icon', '/manifest']
 
 export function middleware(request: NextRequest) {
+  if (process.env.NODE_ENV === 'development') {
+    return NextResponse.next()
+  }
+
   const { pathname } = request.nextUrl
 
   // Let static files and Next.js internals through

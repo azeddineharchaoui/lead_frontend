@@ -104,11 +104,16 @@ export async function toggleTarget(
   );
 }
 
+export interface ScrapeNowResponse {
+  task_id: string;
+  message: string;
+}
+
 export async function scrapeTargetNow(
   ctx: ApiOptions,
   targetId: string,
-): Promise<SuccessResponse> {
-  return apiRequest<SuccessResponse>(
+): Promise<ScrapeNowResponse> {
+  return apiRequest<ScrapeNowResponse>(
     toClientOptions(ctx),
     API.targets.scrapeNow(targetId),
     { method: "POST" },

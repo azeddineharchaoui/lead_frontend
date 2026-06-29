@@ -9,6 +9,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { AuthOrganisation, AuthUser, LoginPayload, RegisterPayload } from './types'
 import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister, refreshTokens } from './api/auth'
+import {
+  DEV_MOCK_ACCESS_TOKEN,
+  DEV_MOCK_ORG,
+  DEV_MOCK_USER,
+  isDevAuthBypass,
+} from './dev-auth'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -16,6 +22,7 @@ interface AuthContextValue {
   accessToken: string | null
   isLoading: boolean
   isAuthenticated: boolean
+  isDevBypass: boolean
   login: (payload: LoginPayload) => Promise<void>
   register: (payload: RegisterPayload) => Promise<void>
   logout: () => Promise<void>
@@ -33,6 +40,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ── Load session on mount ────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
+      if (isDevAuthBypass()) {
+        setAccessToken(DEV_MOCK_ACCESS_TOKEN)
+        setUser(DEV_MOCK_USER)
+        setOrganisation(DEV_MOCK_ORG)
+        setIsLoading(false)
+        return
+      }
+
       try {
         // Try to get a new access token via refresh cookie
         const tokens = await refreshTokens()
@@ -114,6 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         accessToken,
         isLoading,
         isAuthenticated: !!user,
+        isDevBypass: isDevAuthBypass(),
         login,
         register,
         logout,

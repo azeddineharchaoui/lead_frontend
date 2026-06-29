@@ -1,185 +1,152 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useApi } from '@/lib/api-context'
-import { fetchHealth, fetchRoot } from '@/lib/api'
-import { isApiHealthy, isDatabaseHealthy } from '@/lib/types'
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/hooks/useAuth'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, User, Building2, Users, KeyRound, Shield, Plug } from 'lucide-react'
 import { toast } from 'sonner'
-import { Server, Lock, ExternalLink, Loader2 } from 'lucide-react'
-import type { HealthResponse, RootDiscoveryResponse } from '@/lib/types'
+import ProfileTab from './tabs/profile'
+import OrganisationTab from './tabs/organisation'
+import ApiConnectionTab from './tabs/api-connection'
+import { RoleGuard } from '@/components/auth/RoleGuard'
 
 export default function SettingsPage() {
-  const { baseUrl, apiKey, setBaseUrl, setApiKey } = useApi()
-  const [formBaseUrl, setFormBaseUrl] = useState(baseUrl)
-  const [formApiKey, setFormApiKey] = useState(apiKey)
-  const [health, setHealth] = useState<HealthResponse | null>(null)
-  const [root, setRoot] = useState<RootDiscoveryResponse | null>(null)
-  const [healthLoading, setHealthLoading] = useState(false)
-
-  const handleSaveGeneral = () => {
-    setBaseUrl(formBaseUrl)
-    setApiKey(formApiKey)
-    toast.success('Paramètres enregistrés')
-  }
-
-  const checkHealth = async () => {
-    setHealthLoading(true)
-    try {
-      const ctx = { baseUrl: formBaseUrl, apiKey: formApiKey }
-      const [healthData, rootData] = await Promise.all([
-        fetchHealth(ctx),
-        fetchRoot(ctx).catch(() => null),
-      ])
-      setHealth(healthData)
-      setRoot(rootData)
-      toast.success('Connexion backend OK')
-    } catch {
-      setHealth(null)
-      setRoot(null)
-      toast.error('Impossible de joindre le backend')
-    } finally {
-      setHealthLoading(false)
-    }
-  }
+  const { user } = useAuth()
+  const [activeTab, setActiveTab] = useState('profile')
 
   useEffect(() => {
-    checkHealth()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const stored = sessionStorage.getItem('settings_default_tab')
+    if (stored) {
+      sessionStorage.removeItem('settings_default_tab')
+      setActiveTab(stored)
+    }
   }, [])
 
-  const metricsUrl = `${formBaseUrl.replace(/\/$/, '')}/metrics`
-
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Paramètres</h1>
-        <p className="text-gray-600 mt-2">Configuration API et connexion backend</p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Paramètres</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">
+          Gérez votre profil, votre organisation et vos préférences
+        </p>
       </div>
 
-      <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="general">Général</TabsTrigger>
-          <TabsTrigger value="system">Système</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-3 lg:grid-cols-6 w-full border-b border-slate-200 dark:border-slate-800 rounded-none bg-transparent p-0">
+          <TabsTrigger
+            value="profile"
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 dark:data-[state=active]:border-indigo-400 px-4 py-3"
+          >
+            <User className="w-4 h-4 hidden sm:block" />
+            <span className="text-sm font-medium">Profil</span>
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="organisation"
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 dark:data-[state=active]:border-indigo-400 px-4 py-3"
+          >
+            <Building2 className="w-4 h-4 hidden sm:block" />
+            <span className="text-sm font-medium">Org</span>
+          </TabsTrigger>
+
+          <RoleGuard roles={['owner', 'admin']} fallback={null}>
+            <TabsTrigger
+              value="team"
+              className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 dark:data-[state=active]:border-indigo-400 px-4 py-3"
+            >
+              <Users className="w-4 h-4 hidden sm:block" />
+              <span className="text-sm font-medium">Équipe</span>
+            </TabsTrigger>
+          </RoleGuard>
+
+          <RoleGuard roles={['owner', 'admin']} fallback={null}>
+            <TabsTrigger
+              value="api-keys"
+              className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 dark:data-[state=active]:border-indigo-400 px-4 py-3"
+            >
+              <KeyRound className="w-4 h-4 hidden sm:block" />
+              <span className="text-sm font-medium">Clés API</span>
+            </TabsTrigger>
+          </RoleGuard>
+
+          <TabsTrigger
+            value="api"
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 dark:data-[state=active]:border-indigo-400 px-4 py-3"
+          >
+            <Plug className="w-4 h-4 hidden sm:block" />
+            <span className="text-sm font-medium">API</span>
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="security"
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 dark:data-[state=active]:border-indigo-400 px-4 py-3"
+          >
+            <Shield className="w-4 h-4 hidden sm:block" />
+            <span className="text-sm font-medium">Sécurité</span>
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuration de l&apos;API</CardTitle>
-              <CardDescription>
-                URL de base et clé API (requise pour /api/v1/targets*)
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="baseUrl">URL de base de l&apos;API</Label>
-                <Input
-                  id="baseUrl"
-                  placeholder="http://localhost:8000"
-                  value={formBaseUrl}
-                  onChange={(e) => setFormBaseUrl(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">Clé API Administrateur</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  placeholder="X-API-Key pour les cibles de scraping"
-                  value={formApiKey}
-                  onChange={(e) => setFormApiKey(e.target.value)}
-                />
-                <p className="text-xs text-gray-500">
-                  {formApiKey ? 'Clé configurée — accès targets activé' : 'Sans clé: leads et chat uniquement'}
-                </p>
-              </div>
-              <Button onClick={handleSaveGeneral} className="w-full">
-                Sauvegarder
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Profile tab */}
+        <TabsContent value="profile" className="mt-6 space-y-6">
+          <ProfileTab />
         </TabsContent>
 
-        <TabsContent value="system" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Server className="w-5 h-5" />
-                  État du système
-                </CardTitle>
-                <CardDescription>GET /health en direct</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button onClick={checkHealth} disabled={healthLoading} variant="outline" className="w-full gap-2">
-                  {healthLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Vérifier la connexion
-                </Button>
-                {health ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">API</span>
-                      <Badge className={isApiHealthy(health) ? 'bg-green-600' : 'bg-yellow-600'}>
-                        {health.status} v{health.version}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Base de données</span>
-                      <Badge variant="outline" className={isDatabaseHealthy(health) ? 'bg-green-50 text-green-700' : ''}>
-                        {health.components.database}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-gray-500">Environnement: {health.environment}</p>
-                  </>
-                ) : (
-                  <Alert>
-                    <AlertDescription>Cliquez sur vérifier pour tester GET /health</AlertDescription>
-                  </Alert>
-                )}
-                {root && (
-                  <div className="text-xs text-gray-600 border-t pt-3">
-                    <p className="font-medium mb-1">GET / — {root.name} v{root.version}</p>
-                    {root.docs && (
-                      <a href={root.docs} className="text-blue-600 hover:underline">
-                        Documentation API
-                      </a>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        {/* Organisation tab */}
+        <TabsContent value="organisation" className="mt-6 space-y-6">
+          <OrganisationTab />
+        </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="w-5 h-5" />
-                  Métriques Prometheus
-                </CardTitle>
-                <CardDescription>Endpoint ops-only (non intégré au CRM)</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600 mb-4">
-                  Consultez les métriques directement sur le backend:
-                </p>
-                <a
-                  href={metricsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-blue-600 hover:underline text-sm"
-                >
-                  {metricsUrl}
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Team tab */}
+        <RoleGuard roles={['owner', 'admin']}>
+          <TabsContent value="team" className="mt-6 space-y-6">
+            <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-8 text-center">
+              <Users className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-300">Team management coming soon</h3>
+            </div>
+          </TabsContent>
+        </RoleGuard>
+
+        {/* API Keys tab */}
+        <RoleGuard roles={['owner', 'admin']}>
+          <TabsContent value="api-keys" className="mt-6 space-y-6">
+            <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-8 text-center">
+              <KeyRound className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-300">API keys management coming soon</h3>
+            </div>
+          </TabsContent>
+        </RoleGuard>
+
+        <TabsContent value="api" className="mt-6 space-y-6">
+          <ApiConnectionTab />
+        </TabsContent>
+
+        {/* Security tab */}
+        <TabsContent value="security" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5" />
+                Sécurité du compte
+              </CardTitle>
+              <CardDescription>Gérez votre connexion et vos mots de passe</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-indigo-700 dark:text-indigo-200">
+                  <p className="font-semibold">Authentification à deux facteurs</p>
+                  <p className="mt-1">La 2FA sera bientôt disponible pour plus de sécurité</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Dernière connexion le {user?.last_login_at ? new Date(user.last_login_at).toLocaleDateString('fr-FR') : 'Jamais'}
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

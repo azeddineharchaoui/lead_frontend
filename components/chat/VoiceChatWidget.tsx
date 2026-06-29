@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useApi } from '@/lib/api-context'
+import { useApiClient } from '@/hooks/useApiClient'
 import { sendChatMessage, sendAudioMessage, fetchTTS } from '@/lib/api'
 import { showApiError } from '@/lib/api-errors'
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
@@ -56,7 +56,7 @@ export function VoiceChatWidget({
   onStatusChange,
   compact = false,
 }: VoiceChatWidgetProps) {
-  const api = useApi()
+  const api = useApiClient()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping] = useState(false)

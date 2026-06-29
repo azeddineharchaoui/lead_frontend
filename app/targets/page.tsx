@@ -1,20 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useApi } from '@/lib/api-context'
-import {
-  listTargets,
-  createTarget,
-  toggleTarget,
-  scrapeTargetNow,
-  deleteTarget,
-} from '@/lib/api'
+import { useApiClient } from '@/hooks/useApiClient'
+import { listTargets } from '@/lib/api/targets'
 import { showApiError } from '@/lib/api-errors'
-import type { ScrapingTarget } from '@/lib/types'
+import type { ScrapingTarget, ScrapingStatus } from '@/lib/types'
+import { PageHeader } from '@/components/page-header'
+import { AddTargetDialog } from '@/components/targets/add-target-dialog'
+import { TargetCard } from '@/components/targets/target-card'
+import { TargetDetailSheet } from '@/components/target-detail-sheet'
+import { TargetStatusBadge } from '@/components/targets/target-status-badge'
 import { Button } from '@/components/ui/button'
-import { AlertCircle, Plus, Play, Trash2, X } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { toast } from 'sonner'
+import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -23,46 +20,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Card } from '@/components/ui/card'
-import { TargetDetailSheet } from '@/components/target-detail-sheet'
-
-function formatRelativeTime(dateString: string | null): string {
-  if (!dateString) return 'Jamais'
-  const date = new Date(dateString)
-  const now = new Date()
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-  if (seconds < 60) return "À l'instant"
-  if (seconds < 3600) return `Il y a ${Math.floor(seconds / 60)}m`
-  if (seconds < 86400) return `Il y a ${Math.floor(seconds / 3600)}h`
-  return `Il y a ${Math.floor(seconds / 86400)}j`
-}
-
-function StatusDot({ status }: { status: string | null }) {
-  const colors = {
-    success: 'bg-green-500',
-    failed: 'bg-red-500',
-    pending: 'bg-yellow-500',
-    null: 'bg-gray-300',
-  }
-  return (
-    <div
-      className={`w-2 h-2 rounded-full ${colors[status as keyof typeof colors] || colors.null}`}
-    />
-  )
-}
+import { AlertCircle, Plus, Grid, Table, Loader2 } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'sonner'
 
 export default function TargetsPage() {
-  const api = useApi()
+  const api = useApiClient()
   const [targets, setTargets] = useState<ScrapingTarget[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [scrapingId, setScrapingId] = useState<string | null>(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedTarget, setSelectedTarget] = useState<ScrapingTarget | null>(null)
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
-  const [formData, setFormData] = useState({ domain: '', name: '', frequency: '24' })
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
+  const [search, setSearch] = useState('')
+  const [filterActive, setFilterActive] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
 
   const loadTargets = useCallback(async () => {
     if (!api.apiKey) return
@@ -85,15 +58,21 @@ export default function TargetsPage() {
 
   if (!api.apiKey) {
     return (
-      <div className="p-6">
+      <div className="space-y-4">
+        <PageHeader title="Cibles de scraping" description="Gérez les sources de leads" />
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <p className="font-semibold">Clé API admin requise (401)</p>
+            <p className="font-semibold">Clé API admin requise</p>
             <p className="text-sm mt-2">
               Configurez votre clé API dans les paramètres pour accéder aux cibles de scraping.
             </p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={() => (window.location.href = '/settings')}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => (window.location.href = '/settings')}
+            >
               Aller aux Paramètres
             </Button>
           </AlertDescription>
@@ -102,228 +81,217 @@ export default function TargetsPage() {
     )
   }
 
-  const handleScrapingNow = async (e: React.MouseEvent, targetId: string) => {
-    e.stopPropagation()
-    setScrapingId(targetId)
-    try {
-      const res = await scrapeTargetNow(api, targetId)
-      toast.success(res.message || 'Scraping lancé')
-      await loadTargets()
-    } catch (err) {
-      showApiError(err)
-    } finally {
-      setScrapingId(null)
-    }
-  }
+  // Filter targets
+  const filteredTargets = targets.filter((target) => {
+    const matchesSearch =
+      target.domain.toLowerCase().includes(search.toLowerCase()) ||
+      target.name?.toLowerCase().includes(search.toLowerCase())
 
-  const handleDeleteTarget = async (e: React.MouseEvent, targetId: string) => {
-    e.stopPropagation()
-    try {
-      await deleteTarget(api, targetId)
-      toast.success('Cible supprimée')
-      setTargets((prev) => prev.filter((t) => t.id !== targetId))
-    } catch (err) {
-      showApiError(err)
-    }
-  }
+    const matchesActive =
+      filterActive === 'all' ||
+      (filterActive === 'active' && target.is_active) ||
+      (filterActive === 'inactive' && !target.is_active)
 
-  const handleToggleActive = async (targetId: string) => {
-    try {
-      const updated = await toggleTarget(api, targetId)
-      setTargets((prev) => prev.map((t) => (t.id === targetId ? updated : t)))
-    } catch (err) {
-      showApiError(err)
-    }
-  }
+    const matchesStatus =
+      filterStatus === 'all' ||
+      filterStatus === target.last_scraping_status ||
+      (filterStatus === 'never' && !target.last_scraping_status)
 
-  const handleCreateTarget = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!formData.domain) {
-      toast.error('URL du domaine est requise')
-      return
-    }
-    try {
-      const created = await createTarget(api, {
-        domain: formData.domain,
-        name: formData.name || null,
-        scraping_frequency_hours: parseInt(formData.frequency, 10),
-        is_active: true,
-      })
-      setTargets((prev) => [created, ...prev])
-      setIsDialogOpen(false)
-      setFormData({ domain: '', name: '', frequency: '24' })
-      toast.success('Nouvelle cible créée')
-    } catch (err) {
-      showApiError(err)
-    }
-  }
+    return matchesSearch && matchesActive && matchesStatus
+  })
+
+  const activeCount = targets.filter((t) => t.is_active).length
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Cibles de scraping</h1>
-          <p className="text-gray-600 mt-2">Gérez les sources de leads pour le scraping</p>
-        </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nouvelle Cible
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <PageHeader
+          title="Cibles de scraping"
+          description={`${activeCount} active${activeCount !== 1 ? 's' : ''} / ${targets.length} total`}
+        />
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+          <Plus className="w-4 h-4" />
+          Ajouter
         </Button>
       </div>
 
       {error && (
         <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
+      {/* Filters */}
+      <Card className="p-4 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Search */}
+          <Input
+            placeholder="Rechercher domaine ou nom..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="text-sm"
+          />
+
+          {/* Active filter */}
+          <Select value={filterActive} onValueChange={setFilterActive}>
+            <SelectTrigger className="text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous</SelectItem>
+              <SelectItem value="active">Actives</SelectItem>
+              <SelectItem value="inactive">Inactives</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Status filter */}
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les statuts</SelectItem>
+              <SelectItem value="success">Succès</SelectItem>
+              <SelectItem value="failed">Erreur</SelectItem>
+              <SelectItem value="never">Jamais scrappé</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* View toggle */}
+        <div className="flex gap-2">
+          <Button
+            variant={viewMode === 'card' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('card')}
+            className="gap-2"
+          >
+            <Grid className="w-4 h-4" />
+            Grille
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('table')}
+            className="gap-2"
+          >
+            <Table className="w-4 h-4" />
+            Tableau
+          </Button>
+        </div>
+      </Card>
+
+      {/* Content */}
       {loading ? (
-        <p className="text-gray-500">Chargement...</p>
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+        </div>
+      ) : filteredTargets.length === 0 ? (
+        <Card className="p-12 text-center">
+          <p className="text-slate-600 dark:text-slate-400 mb-4">
+            {targets.length === 0 ? 'Aucune cible configurée' : 'Aucune cible ne correspond aux filtres'}
+          </p>
+          {targets.length === 0 && (
+            <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Créer une cible
+            </Button>
+          )}
+        </Card>
+      ) : viewMode === 'card' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredTargets.map((target) => (
+            <TargetCard
+              key={target.id}
+              target={target}
+              onEdit={(t) => {
+                setSelectedTarget(t)
+                setIsDetailSheetOpen(true)
+              }}
+              onDelete={(id) => setTargets((prev) => prev.filter((t) => t.id !== id))}
+              onScrapingComplete={() => loadTargets()}
+            />
+          ))}
+        </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Nom / Domaine</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Statut</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Fréquence</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Dernier Scraping</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Leads Générés</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {targets.length === 0 ? (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 dark:bg-slate-800 border-b">
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    Aucune cible configurée
-                  </td>
+                  <th className="px-4 py-3 text-left font-medium">Domaine</th>
+                  <th className="px-4 py-3 text-left font-medium">Statut</th>
+                  <th className="px-4 py-3 text-center font-medium">Leads</th>
+                  <th className="px-4 py-3 text-center font-medium">Erreurs</th>
+                  <th className="px-4 py-3 text-left font-medium">Fréquence</th>
+                  <th className="px-4 py-3 text-right font-medium">Actions</th>
                 </tr>
-              ) : (
-                targets.map((target) => (
+              </thead>
+              <tbody className="divide-y">
+                {filteredTargets.map((target) => (
                   <tr
                     key={target.id}
-                    className="hover:bg-gray-50 cursor-pointer"
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer"
                     onClick={() => {
                       setSelectedTarget(target)
                       setIsDetailSheetOpen(true)
                     }}
                   >
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-gray-900">{target.name || target.domain}</p>
-                      <p className="text-sm text-gray-600">{target.domain}</p>
+                    <td className="px-4 py-3">
+                      <a
+                        href={target.domain}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-indigo-600 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {target.name || target.domain}
+                      </a>
                     </td>
-                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                      <Switch
-                        checked={target.is_active}
-                        onCheckedChange={() => handleToggleActive(target.id)}
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <TargetStatusBadge
+                        status={target.last_scraping_status}
+                        errorCount={target.error_count}
                       />
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{target.scraping_frequency_hours}h</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <StatusDot status={target.last_scraping_status} />
-                        <span className="text-sm text-gray-900">
-                          {formatRelativeTime(target.last_scraped_at)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {target.leads_count}
+                    <td className="px-4 py-3 text-center">{target.leads_count}</td>
+                    <td className="px-4 py-3 text-center">
                       {target.error_count > 0 && (
-                        <p className="text-xs text-red-600 mt-1">{target.error_count} erreurs</p>
+                        <span className="text-red-600 font-medium">{target.error_count}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleScrapingNow(e, target.id)}
-                          disabled={scrapingId === target.id}
-                          className="h-8 w-8 p-0"
-                        >
-                          {scrapingId === target.id ? (
-                            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Play className="w-4 h-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleDeleteTarget(e, target.id)}
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                    <td className="px-4 py-3">{target.scraping_frequency_hours}h</td>
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedTarget(target)
+                          setIsDetailSheetOpen(true)
+                        }}
+                      >
+                        Éditer
+                      </Button>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
-      {isDialogOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center">
-          <Card className="w-full max-w-md">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold">Créer une nouvelle cible</h2>
-              <Button variant="ghost" size="sm" onClick={() => setIsDialogOpen(false)} className="h-8 w-8 p-0">
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <form onSubmit={handleCreateTarget} className="p-6 space-y-4">
-              <div>
-                <Label htmlFor="domain">URL du domaine *</Label>
-                <Input
-                  id="domain"
-                  placeholder="exemple.com"
-                  value={formData.domain}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, domain: e.target.value }))}
-                  className="mt-2"
-                />
-              </div>
-              <div>
-                <Label htmlFor="name">Nom de la cible</Label>
-                <Input
-                  id="name"
-                  placeholder="Ex: LinkedIn Professionals"
-                  value={formData.name}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                  className="mt-2"
-                />
-              </div>
-              <div>
-                <Label htmlFor="frequency">Fréquence (heures)</Label>
-                <Select
-                  value={formData.frequency}
-                  onValueChange={(value) => value && setFormData((prev) => ({ ...prev, frequency: value }))}
-                >
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="6">Toutes les 6 heures</SelectItem>
-                    <SelectItem value="12">Toutes les 12 heures</SelectItem>
-                    <SelectItem value="24">Tous les jours</SelectItem>
-                    <SelectItem value="48">Tous les 2 jours</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex gap-2 justify-end pt-4 border-t border-gray-200 mt-6">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Annuler
-                </Button>
-                <Button type="submit">Créer</Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
+      {/* Dialogs */}
+      <AddTargetDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onTargetCreated={(target) => {
+          setTargets((prev) => [target, ...prev])
+          toast.success('Cible créée avec succès')
+        }}
+      />
 
       <TargetDetailSheet
         target={selectedTarget}
@@ -332,6 +300,10 @@ export default function TargetsPage() {
         onUpdate={(updatedTarget) => {
           setTargets((prev) => prev.map((t) => (t.id === updatedTarget.id ? updatedTarget : t)))
           setSelectedTarget(updatedTarget)
+        }}
+        onDelete={(id) => {
+          setTargets((prev) => prev.filter((t) => t.id !== id))
+          setIsDetailSheetOpen(false)
         }}
       />
     </div>

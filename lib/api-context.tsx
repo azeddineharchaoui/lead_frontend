@@ -3,20 +3,28 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { ApiContextType } from './types'
 
+const DEFAULT_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:8000'
+const DEFAULT_API_KEY = process.env.NEXT_PUBLIC_DEFAULT_API_KEY || ''
+
 const ApiContext = createContext<ApiContextType | undefined>(undefined)
 
-// WARNING: This is for v0 prototype only. In production, use secure auth solutions.
 export function ApiProvider({ children }: { children: React.ReactNode }) {
-  const [baseUrl, setBaseUrlState] = useState('http://localhost:8000')
-  const [apiKey, setApiKeyState] = useState('')
+  const [baseUrl, setBaseUrlState] = useState(DEFAULT_BASE_URL)
+  const [apiKey, setApiKeyState] = useState(DEFAULT_API_KEY)
+  const [hydrated, setHydrated] = useState(false)
 
-  // Load from localStorage on mount
   useEffect(() => {
     const savedBaseUrl = localStorage.getItem('lead_crm_base_url')
     const savedApiKey = localStorage.getItem('lead_crm_api_key')
 
     if (savedBaseUrl) setBaseUrlState(savedBaseUrl)
+    else setBaseUrlState(DEFAULT_BASE_URL)
+
     if (savedApiKey) setApiKeyState(savedApiKey)
+    else if (DEFAULT_API_KEY) setApiKeyState(DEFAULT_API_KEY)
+
+    setHydrated(true)
   }, [])
 
   const setBaseUrl = (url: string) => {
@@ -29,7 +37,21 @@ export function ApiProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('lead_crm_api_key', key)
   }
 
-  // Always provide context even before mount to prevent hydration errors
+  if (!hydrated) {
+    return (
+      <ApiContext.Provider
+        value={{
+          baseUrl: DEFAULT_BASE_URL,
+          apiKey: DEFAULT_API_KEY,
+          setBaseUrl,
+          setApiKey,
+        }}
+      >
+        {children}
+      </ApiContext.Provider>
+    )
+  }
+
   return (
     <ApiContext.Provider value={{ baseUrl, apiKey, setBaseUrl, setApiKey }}>
       {children}

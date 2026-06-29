@@ -6,6 +6,18 @@ export type ChatChannel = "web_chat" | "whatsapp" | "sms" | "email";
 
 export type ScrapingStatus = "success" | "failed" | "pending";
 
+export type TaskState = "pending" | "started" | "success" | "failure";
+
+export interface TaskStatusResponse {
+  state: TaskState;
+  ready: boolean;
+  result: string | Record<string, unknown> | null;
+  progress?: {
+    current: number;
+    total: number;
+  } | null;
+}
+
 export interface ApiContextType {
   baseUrl: string;
   apiKey: string;
@@ -24,9 +36,34 @@ export interface Lead {
   scraping_target_id: string | null;
   call_attempts: number;
   last_called_at: string | null;
+  assigned_to?: string | null;
   qualification_score?: number | null;
+  crm_pushed_at?: string | null;
+  crm_push_attempts?: number;
+  crm_last_error?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface HistoryEntry {
+  id: string;
+  from_status: string | null;
+  to_status: string;
+  changed_by: string | null;
+  reason: string | null;
+  extra_data: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface LeadStatusUpdate {
+  status: LeadStatus;
+  notes?: string | null;
+}
+
+export interface LeadUpdate {
+  notes?: string | null;
+  company_name?: string | null;
+  assigned_to?: string | null;
 }
 
 export interface LeadSessionSummary {
@@ -108,6 +145,35 @@ export interface ChatbotResponse {
 
 export interface AudioChatResponse extends ChatbotResponse {
   transcript: string;
+}
+
+export type CaptureStatus = "need_phone" | "need_confirm" | "complete";
+
+export interface VisitorStartRequest {
+  phone_number?: string;
+  company_name?: string;
+  source_url?: string;
+  channel?: ChatChannel;
+  initial_message?: string;
+}
+
+export interface VisitorMessageRequest {
+  visitor_token: string;
+  message: string;
+}
+
+export interface VisitorChatResponse extends ChatbotResponse {
+  session_id: string | null;
+  visitor_token: string | null;
+  lead_id: string | null;
+  lead_created: boolean;
+  capture_status: CaptureStatus;
+  missing_fields: string[];
+  extracted?: {
+    phone?: string;
+    company_name?: string;
+    contact_name?: string;
+  } | null;
 }
 
 export interface ScrapingTarget {
@@ -245,4 +311,18 @@ export interface TokenResponse {
 export interface MeResponse {
   user: AuthUser;
   organisation: AuthOrganisation;
+}
+
+export interface ApiKeyResponse {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  expires_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface ApiKeyCreatedResponse extends ApiKeyResponse {
+  raw_key: string;
 }

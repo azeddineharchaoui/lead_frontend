@@ -8,6 +8,8 @@ export const API = {
     pending: "/api/v1/leads/pending",
     detail: (id: string) => `/api/v1/leads/${id}`,
     status: (id: string) => `/api/v1/leads/${id}/status`,
+    history: (id: string) => `/api/v1/leads/${id}/history`,
+    assign: (id: string) => `/api/v1/leads/${id}/assign`,
     sessions: (leadId: string) => `/api/v1/leads/${leadId}/sessions`,
     session: (leadId: string, sessionId: string) =>
       `/api/v1/leads/${leadId}/sessions/${sessionId}`,
@@ -16,6 +18,8 @@ export const API = {
     webhook: "/webhook/chat",
     audio:   "/webhook/chat/audio",
     tts:     "/webhook/chat/tts",
+    visitorStart: "/webhook/chat/visitor/start",
+    visitorMessage: "/webhook/chat/visitor/message",
   },
   targets: {
     list: "/api/v1/targets",
@@ -24,5 +28,8 @@ export const API = {
     toggle: (id: string) => `/api/v1/targets/${id}/toggle`,
     scrapeNow: (id: string) => `/api/v1/targets/${id}/scrape-now`,
     leads: (id: string) => `/api/v1/targets/${id}/leads`,
+  },
+  tasks: {
+    status: (id: string) => `/api/v1/tasks/${id}`,
   },
 } as const;

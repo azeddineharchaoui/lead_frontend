@@ -1,22 +1,39 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useApi } from '@/lib/api-context'
+import { useApiClient } from '@/hooks/useApiClient'
 import {
   getTarget,
   updateTarget,
   toggleTarget,
-  scrapeTargetNow,
   listTargetLeads,
-} from '@/lib/api'
+  deleteTarget,
+} from '@/lib/api/targets'
 import { showApiError } from '@/lib/api-errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { StatusBadge } from '@/components/status-badge'
-import { X, Loader2, Ghost, Play } from 'lucide-react'
+import { ScrapeNowButton } from '@/components/targets/scrape-now-button'
+import { Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ScrapingTarget, Lead } from '@/lib/types'
 
@@ -25,6 +42,7 @@ interface TargetDetailSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpdate: (target: ScrapingTarget) => void
+  onDelete?: (targetId: string) => void
 }
 
 export function TargetDetailSheet({
@@ -32,18 +50,20 @@ export function TargetDetailSheet({
   open,
   onOpenChange,
   onUpdate,
+  onDelete,
 }: TargetDetailSheetProps) {
-  const api = useApi()
+  const api = useApiClient()
   const [detail, setDetail] = useState<ScrapingTarget | null>(null)
   const [leads, setLeads] = useState<Lead[]>([])
   const [leadsLoading, setLeadsLoading] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     frequency: '24',
     selectors: '{}',
   })
   const [isUpdating, setIsUpdating] = useState(false)
-  const [scraping, setScraping] = useState(false)
 
   useEffect(() => {
     if (!open || !target) {
@@ -78,41 +98,30 @@ export function TargetDetailSheet({
   if (!open || !target || !detail) return null
 
   const handleToggle = async () => {
+    if (!detail) return
     try {
-      const updated = await toggleTarget(api, target.id)
+      const updated = await toggleTarget(api, detail.id)
       setDetail(updated)
       onUpdate(updated)
+      toast.success(updated.is_active ? 'Cible activée' : 'Cible désactivée')
     } catch (err) {
       showApiError(err)
-    }
-  }
-
-  const handleScrapeNow = async () => {
-    setScraping(true)
-    try {
-      const res = await scrapeTargetNow(api, target.id)
-      toast.success(res.message || 'Scraping lancé')
-      const refreshed = await getTarget(api, target.id)
-      setDetail(refreshed)
-      onUpdate(refreshed)
-    } catch (err) {
-      showApiError(err)
-    } finally {
-      setScraping(false)
     }
   }
 
   const handleUpdate = async () => {
+    if (!detail) return
     setIsUpdating(true)
     try {
       let custom_selectors: Record<string, string> | null = null
       try {
-        custom_selectors = JSON.parse(formData.selectors)
+        const parsed = JSON.parse(formData.selectors)
+        custom_selectors = Object.keys(parsed).length > 0 ? parsed : null
       } catch {
         toast.error('JSON des sélecteurs invalide')
         return
       }
-      const updated = await updateTarget(api, target.id, {
+      const updated = await updateTarget(api, detail.id, {
         name: formData.name || null,
         scraping_frequency_hours: parseInt(formData.frequency, 10),
         custom_selectors,
@@ -127,132 +136,211 @@ export function TargetDetailSheet({
     }
   }
 
+  const handleDelete = async () => {
+    if (!detail) return
+    setDeleting(true)
+    try {
+      await deleteTarget(api, detail.id)
+      toast.success('Cible supprimée')
+      onDelete?.(detail.id)
+      onOpenChange(false)
+    } catch (err) {
+      showApiError(err)
+    } finally {
+      setDeleting(false)
+      setShowDeleteConfirm(false)
+    }
+  }
+
+  const handleScrapingComplete = async () => {
+    if (!detail) return
+    try {
+      const refreshed = await getTarget(api, detail.id)
+      setDetail(refreshed)
+      onUpdate(refreshed)
+    } catch (err) {
+      showApiError(err)
+    }
+  }
+
+  if (!target || !detail) return null
+
   return (
-    <div className={`fixed inset-0 z-50 transition-all duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-      <div className="absolute inset-0 bg-black/40" onClick={() => onOpenChange(false)} />
-      <div
-        className={`absolute top-0 right-0 bottom-0 w-full max-w-2xl bg-white shadow-xl transition-transform duration-300 ${
-          open ? 'translate-x-0' : 'translate-x-full'
-        } overflow-y-auto`}
-      >
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
-          <div>
-            <h2 className="text-lg font-semibold">{detail.name || detail.domain}</h2>
-            <p className="text-sm text-gray-600">{detail.domain}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Switch checked={detail.is_active} onCheckedChange={handleToggle} />
-            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="h-8 w-8 p-0">
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>{detail.name || detail.domain}</SheetTitle>
+            <SheetDescription className="break-words">{detail.domain}</SheetDescription>
+          </SheetHeader>
 
-        <Tabs defaultValue="configuration" className="w-full">
-          <TabsList className="w-full rounded-none border-b border-gray-200 bg-transparent p-0 h-auto">
-            <TabsTrigger value="configuration" className="rounded-none border-b-2 border-transparent py-3 data-[state=active]:border-blue-500">
-              Configuration
-            </TabsTrigger>
-            <TabsTrigger
-              value="leads"
-              className="rounded-none border-b-2 border-transparent py-3 data-[state=active]:border-blue-500"
-              onClick={loadLeads}
-            >
-              Leads Collectés
-            </TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsTrigger value="overview" className="text-xs">
+                Aperçu
+              </TabsTrigger>
+              <TabsTrigger value="config" className="text-xs">
+                Config
+              </TabsTrigger>
+              <TabsTrigger value="leads" className="text-xs" onClick={loadLeads}>
+                Leads
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="configuration" className="p-6 space-y-6">
-            <div>
-              <Label className="font-medium">Domaine (lecture seule)</Label>
-              <div className="mt-2 p-3 bg-gray-100 rounded text-gray-600">{detail.domain}</div>
-            </div>
-            <div>
-              <Label htmlFor="name">Nom de la cible</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                disabled={isUpdating}
-                className="mt-2"
-              />
-            </div>
-            <div>
-              <Label htmlFor="frequency">Fréquence de scraping (heures)</Label>
-              <Input
-                id="frequency"
-                type="number"
-                min="1"
-                max="168"
-                value={formData.frequency}
-                onChange={(e) => setFormData((prev) => ({ ...prev, frequency: e.target.value }))}
-                disabled={isUpdating}
-                className="mt-2"
-              />
-            </div>
-            <div>
-              <Label htmlFor="selectors">Sélecteurs personnalisés (JSON)</Label>
-              <textarea
-                id="selectors"
-                value={formData.selectors}
-                onChange={(e) => setFormData((prev) => ({ ...prev, selectors: e.target.value }))}
-                disabled={isUpdating}
-                className="mt-2 w-full h-40 p-3 border border-gray-300 rounded font-mono text-sm bg-gray-50"
-              />
-            </div>
-            <Button onClick={handleUpdate} disabled={isUpdating} className="w-full gap-2">
-              {isUpdating && <Loader2 className="w-4 h-4 animate-spin" />}
-              Mettre à jour
-            </Button>
-            <Button onClick={handleScrapeNow} disabled={scraping} variant="outline" className="w-full gap-2">
-              {scraping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              Lancer le scraping maintenant
-            </Button>
-          </TabsContent>
-
-          <TabsContent value="leads" className="p-6">
-            {leadsLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            {/* Overview tab */}
+            <TabsContent value="overview" className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg">
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Leads</p>
+                  <p className="text-lg font-semibold">{detail.leads_count}</p>
+                </div>
+                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg">
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Erreurs</p>
+                  <p className="text-lg font-semibold">{detail.error_count}</p>
+                </div>
+                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg">
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Fréq</p>
+                  <p className="text-lg font-semibold">{detail.scraping_frequency_hours}h</p>
+                </div>
               </div>
-            ) : leads.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Ghost className="w-12 h-12 text-gray-400 mb-4" />
-                <p className="text-gray-600">Aucun lead extrait de cette cible.</p>
+
+              <div className="space-y-2">
+                <p className="text-xs text-slate-600 dark:text-slate-400">Actif</p>
+                <div className="flex items-center justify-between">
+                  <span>{detail.is_active ? 'Oui' : 'Non'}</span>
+                  <Switch checked={detail.is_active} onCheckedChange={handleToggle} />
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">Téléphone</th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">Statut</th>
-                      <th className="text-left py-2 px-4 font-medium text-gray-700">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leads.map((lead) => (
-                      <tr key={lead.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="py-2 px-4">
-                          <a href={`/leads/${lead.id}`} className="text-blue-600 hover:underline">
-                            {lead.phone_number}
-                          </a>
-                        </td>
-                        <td className="py-2 px-4">
-                          <StatusBadge status={lead.status} />
-                        </td>
-                        <td className="py-2 px-4 text-gray-600">
+
+              <ScrapeNowButton
+                targetId={detail.id}
+                onComplete={handleScrapingComplete}
+              />
+            </TabsContent>
+
+            {/* Config tab */}
+            <TabsContent value="config" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nom de la cible</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  disabled={isUpdating}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="frequency">Fréquence (heures)</Label>
+                <Input
+                  id="frequency"
+                  type="number"
+                  min="1"
+                  max="168"
+                  value={formData.frequency}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      frequency: e.target.value,
+                    }))
+                  }
+                  disabled={isUpdating}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="selectors">Sélecteurs (JSON)</Label>
+                <textarea
+                  id="selectors"
+                  value={formData.selectors}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      selectors: e.target.value,
+                    }))
+                  }
+                  disabled={isUpdating}
+                  className="w-full h-40 p-2 border rounded font-mono text-xs"
+                />
+              </div>
+
+              <Button onClick={handleUpdate} disabled={isUpdating} className="w-full gap-2">
+                {isUpdating && <Loader2 className="w-4 h-4 animate-spin" />}
+                Mettre à jour
+              </Button>
+
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleting}
+                className="w-full gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Supprimer
+              </Button>
+            </TabsContent>
+
+            {/* Leads tab */}
+            <TabsContent value="leads" className="space-y-4">
+              {leadsLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : leads.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <p>Aucun lead collecté</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {leads.map((lead) => (
+                    <a
+                      key={lead.id}
+                      href={`/leads/${lead.id}`}
+                      className="block p-3 border rounded hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <p className="font-mono text-sm font-medium">{lead.phone_number}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <StatusBadge status={lead.status} />
+                        <span className="text-xs text-slate-500">
                           {new Date(lead.created_at).toLocaleDateString('fr-FR')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+                        </span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette cible ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Tous les leads associés seront conservés mais
+              cette cible de scraping sera supprimée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex items-center gap-3 rounded bg-amber-50 p-3 text-sm">
+            <span className="text-amber-800">{detail.domain}</span>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Supprimer
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

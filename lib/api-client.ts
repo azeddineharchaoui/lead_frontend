@@ -1,22 +1,24 @@
-type ApiErrorPayload =
-  | {
-      detail?:
-        | { error?: string; message?: string; detail?: unknown }
-        | string
-        | Array<{ msg?: string }>
-    }
-  | { error?: string; message?: string; detail?: unknown }
-
 export interface ApiClientOptions {
   baseUrl: string
   apiKey?: string
+  accessToken?: string
+}
+
+const DEV_BYPASS_TOKEN = 'dev-bypass-token'
+
+function applyAuthHeaders(headers: Headers, options: ApiClientOptions): void {
+  const token = options.accessToken
+  if (token && token !== DEV_BYPASS_TOKEN) {
+    headers.set('Authorization', `Bearer ${token}`)
+  } else if (options.apiKey) {
+    headers.set('X-API-Key', options.apiKey)
+  }
 }
 
 export async function apiRequest<T>(
   options: ApiClientOptions,
   path: string,
   init: RequestInit = {},
-  requiresApiKey = false,
 ): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
@@ -25,12 +27,7 @@ export async function apiRequest<T>(
     headers.set('Content-Type', 'application/json')
   }
 
-  if (requiresApiKey) {
-    if (!options.apiKey) {
-      throw new Error('Admin API key required')
-    }
-    headers.set('X-API-Key', options.apiKey)
-  }
+  applyAuthHeaders(headers, options)
 
   const response = await fetch(`${options.baseUrl}${path}`, {
     ...init,
@@ -80,4 +77,14 @@ export function normalizeApiError(status: number, body: any): Error {
   error.code = code
   error.raw = body
   return error
+}
+
+export function buildAuthHeaderRecord(options: ApiClientOptions): Record<string, string> {
+  const headers = new Headers()
+  applyAuthHeaders(headers, options)
+  const record: Record<string, string> = {}
+  headers.forEach((value, key) => {
+    record[key] = value
+  })
+  return record
 }
