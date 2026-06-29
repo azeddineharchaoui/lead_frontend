@@ -184,7 +184,7 @@ export function OnboardingSteps({ organisation, onComplete }: OnboardingStepsPro
             </div>
             <div>
               <label className="text-sm font-medium">Fuseau horaire</label>
-              <Select value={timezone} onValueChange={setTimezone}>
+              <Select value={timezone} onValueChange={setTimezone as any}>
                 <SelectTrigger className="mt-2">
                   <SelectValue />
                 </SelectTrigger>

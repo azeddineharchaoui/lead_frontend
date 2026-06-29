@@ -67,7 +67,11 @@ export async function register(payload: RegisterPayload): Promise<MeResponse> {
 
 /** Login with email + password */
 export async function login(payload: LoginPayload): Promise<TokenResponse> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+  // Use proxy route in production, direct backend in development
+  const useProxy = process.env.NEXT_PUBLIC_USE_AUTH_PROXY === "true";
+  const endpoint = useProxy ? "/api/auth/login" : `${API_BASE}/auth/login`;
+  
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -82,7 +86,11 @@ export async function login(payload: LoginPayload): Promise<TokenResponse> {
 
 /** Refresh the access token using the httpOnly refresh token cookie */
 export async function refreshTokens(): Promise<TokenResponse> {
-  const res = await fetch(`${API_BASE}/auth/refresh`, {
+  // Use proxy route in production, direct backend in development
+  const useProxy = process.env.NEXT_PUBLIC_USE_AUTH_PROXY === "true";
+  const endpoint = useProxy ? "/api/auth/refresh" : `${API_BASE}/auth/refresh`;
+  
+  const res = await fetch(endpoint, {
     method: "POST",
     credentials: "include",
   });
@@ -92,7 +100,11 @@ export async function refreshTokens(): Promise<TokenResponse> {
 
 /** Logout — revokes refresh token + clears cookie */
 export async function logout(accessToken?: string | null): Promise<void> {
-  await fetch(`${API_BASE}/auth/logout`, {
+  // Use proxy route in production, direct backend in development
+  const useProxy = process.env.NEXT_PUBLIC_USE_AUTH_PROXY === "true";
+  const endpoint = useProxy ? "/api/auth/logout" : `${API_BASE}/auth/logout`;
+  
+  await fetch(endpoint, {
     method: "POST",
     credentials: "include",
     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},

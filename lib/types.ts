@@ -326,3 +326,13 @@ export interface ApiKeyResponse {
 export interface ApiKeyCreatedResponse extends ApiKeyResponse {
   raw_key: string;
 }
+
+export interface PlanResponse {
+  id: string;
+  name: string;
+  max_leads: number;
+  max_targets: number;
+  max_agents: number;
+  price_monthly_usd: string;
+  created_at: string;
+}
