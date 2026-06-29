@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronDown,
   Volume2,
+  Mic,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { RoleGuard } from './auth/RoleGuard'
@@ -51,6 +52,13 @@ const navigationItems = [
     href: '/chat-widget-demo',
     icon: MessageCircle,
     match: (pathname: string) => pathname === '/chat-widget-demo' || pathname.startsWith('/chat-widget-demo/'),
+  },
+  {
+    label: 'Lab Vocal',
+    href: '/chat-voice-lab',
+    icon: Mic,
+    match: (pathname: string) => pathname === '/chat-voice-lab' || pathname.startsWith('/chat-voice-lab/'),
+    roles: ['owner', 'admin', 'agent'],
   },
   {
     label: 'Paramètres',

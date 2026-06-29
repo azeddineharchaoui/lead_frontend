@@ -1,19 +1,25 @@
 'use client'
 
+import { useState } from 'react'
 import { CaptureStatusBanner } from './capture-status-banner'
 import { ChatComposer } from './chat-composer'
 import { MessageList } from './message-list'
+import { VoiceModeOverlay } from './voice-mode-overlay'
 import { AlertCircle } from 'lucide-react'
 import type { UseVisitorChatSessionReturn } from '@/hooks/useVisitorChatSession'
+import type { AudioChatResponse } from '@/lib/types'
+import { toast } from 'sonner'
 
 interface VisitorChatPanelProps {
   session: UseVisitorChatSessionReturn
   canSendMessage?: boolean
+  showVoiceButton?: boolean
 }
 
 export function VisitorChatPanel({
   session,
   canSendMessage = true,
+  showVoiceButton = true,
 }: VisitorChatPanelProps) {
   const {
     messages,
@@ -27,7 +33,19 @@ export function VisitorChatPanel({
     visitorToken,
   } = session
 
+  const [voiceOverlayOpen, setVoiceOverlayOpen] = useState(false)
+
   const disabled = !canSendMessage || !visitorToken || isStarting
+
+  const handleAudioResponse = (response: AudioChatResponse) => {
+    // Append user transcript as message
+    sendMessage(response.transcript)
+
+    // Show lead status change if applicable
+    if (response.lead_status_changed) {
+      toast.success(`Statut changé: ${response.new_lead_status}`)
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col min-h-0">
@@ -52,9 +70,18 @@ export function VisitorChatPanel({
           onSendMessage={sendMessage}
           isSending={isSending}
           disabled={disabled}
-          showVoiceButton={false}
+          showVoiceButton={showVoiceButton && !disabled}
+          onVoiceClick={() => setVoiceOverlayOpen(true)}
         />
       </div>
+
+      {/* Voice Mode Overlay */}
+      <VoiceModeOverlay
+        open={voiceOverlayOpen}
+        onClose={() => setVoiceOverlayOpen(false)}
+        visitorToken={visitorToken || undefined}
+        onResponse={handleAudioResponse}
+      />
     </div>
   )
 }
