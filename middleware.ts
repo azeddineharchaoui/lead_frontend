@@ -14,6 +14,8 @@ const PUBLIC_PATHS = [
   '/forgot-password',
   '/reset-password',
   '/verify-email',
+  '/embed',
+  '/chat-widget-demo',
 ]
 
 // Static / API routes that should always pass through

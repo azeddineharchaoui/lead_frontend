@@ -6,6 +6,7 @@ import { ApiProvider } from '@/lib/api-context'
 import { AuthProvider } from '@/lib/auth-context'
 import { AppShell } from '@/components/app-shell'
 import { DevPanel } from '@/components/dev-panel'
+import { OnboardingGuard } from '@/components/auth/onboarding-guard'
 import { isDevAuthBypass } from '@/lib/dev-auth'
 import './globals.css'
 
@@ -59,7 +60,9 @@ export default function RootLayout({
       <body className="font-sans antialiased bg-slate-50 dark:bg-slate-950">
         <AuthProvider>
           <ApiProvider>
-            <AppShell>{children}</AppShell>
+            <OnboardingGuard>
+              <AppShell>{children}</AppShell>
+            </OnboardingGuard>
             <Toaster richColors position="top-right" />
             {isDevAuthBypass() && <DevPanel />}
           </ApiProvider>

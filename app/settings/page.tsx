@@ -14,6 +14,7 @@ import OrganisationTab from './tabs/organisation'
 import TeamTab from './tabs/team'
 import ApiKeysTab from './tabs/api-keys'
 import ApiConnectionTab from './tabs/api-connection'
+import { SecurityTab } from './tabs/security'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 
 export default function SettingsPage() {
@@ -122,27 +123,7 @@ export default function SettingsPage() {
 
         {/* Security tab */}
         <TabsContent value="security" className="mt-6 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Sécurité du compte
-              </CardTitle>
-              <CardDescription>Gérez votre connexion et vos mots de passe</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-indigo-700 dark:text-indigo-200">
-                  <p className="font-semibold">Authentification à deux facteurs</p>
-                  <p className="mt-1">La 2FA sera bientôt disponible pour plus de sécurité</p>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Dernière connexion le {user?.last_login_at ? new Date(user.last_login_at).toLocaleDateString('fr-FR') : 'Jamais'}
-              </p>
-            </CardContent>
-          </Card>
+          <SecurityTab />
         </TabsContent>
       </Tabs>
     </div>
