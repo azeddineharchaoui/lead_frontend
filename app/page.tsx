@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboardData } from '@/hooks/useDashboardData'
 import { PageHeader } from '@/components/page-header'
@@ -9,7 +10,10 @@ import { HealthWidget } from '@/components/health-widget'
 import { ScrapingOverview } from '@/components/scraping-overview'
 import { RecentLeadsTable } from '@/components/recent-leads-table'
 import { AgentQuickActions } from '@/components/dashboard/agent-quick-actions'
-import { Users, UserPlus, CheckCircle, TrendingUp } from 'lucide-react'
+import { LeadStatusChart } from '@/components/dashboard/lead-status-chart'
+import { TopTargetsChart } from '@/components/dashboard/top-targets-chart'
+import { Button } from '@/components/ui/button'
+import { Users, UserPlus, CheckCircle, TrendingUp, Zap } from 'lucide-react'
 
 function DashboardSkeleton() {
   return (
@@ -73,6 +77,12 @@ function DashboardContent() {
         />
       </div>
 
+      {/* Charts row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LeadStatusChart stats={stats} />
+        <TopTargetsChart stats={stats} />
+      </div>
+
       {/* Main grid: Health + Agent actions (if applicable) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <HealthWidget />
@@ -84,6 +94,29 @@ function DashboardContent() {
       {!isAgent && (isAdmin || isOwner) && (
         <div className="lg:hidden">
           <ScrapingOverview overview={stats} />
+        </div>
+      )}
+
+      {/* Quick actions for admin/owner */}
+      {(isAdmin || isOwner) && (
+        <div className="flex flex-wrap gap-3">
+          <Button asChild variant="outline" className="gap-2">
+            <Link href="/leads/new">
+              <UserPlus className="w-4 h-4" />
+              Nouveau lead
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="gap-2">
+            <Link href="/targets">
+              <Zap className="w-4 h-4" />
+              Scraper une cible
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="gap-2">
+            <Link href="/chat-ops">
+              Opérations chat
+            </Link>
+          </Button>
         </div>
       )}
 
