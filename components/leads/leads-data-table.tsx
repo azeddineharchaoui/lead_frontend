@@ -2,6 +2,9 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { useApiClient } from '@/hooks/useApiClient'
+import { deleteLead } from '@/lib/api/leads'
+import { RoleGuard } from '@/components/auth/RoleGuard'
 import type { Lead } from '@/lib/types'
 import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
@@ -13,17 +16,93 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { formatPhoneDisplay, formatRelativeTime, truncate, copyToClipboard } from '@/lib/format'
-import { Copy, ArrowRight, Phone, Building2 } from 'lucide-react'
+import { Copy, ArrowRight, Phone, Building2, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+
+type SortKey = 'created_at' | 'status' | 'company_name' | 'phone_number'
+type SortOrder = 'asc' | 'desc'
 
 interface LeadsDataTableProps {
   leads: Lead[]
   onPhoneClick?: (phone: string) => void
+  onLeadDeleted?: (leadId: string) => void
 }
 
-export function LeadsDataTable({ leads, onPhoneClick }: LeadsDataTableProps) {
+export function LeadsDataTable({ leads, onPhoneClick, onLeadDeleted }: LeadsDataTableProps) {
+  const api = useApiClient()
+  const { user } = useAuth()
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey>('created_at')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortOrder('asc')
+    }
+  }
+
+  const sortLeads = (leadsToSort: Lead[]) => {
+    return [...leadsToSort].sort((a, b) => {
+      let aVal: any = a[sortKey as keyof Lead]
+      let bVal: any = b[sortKey as keyof Lead]
+
+      // Handle null/undefined
+      if (aVal == null && bVal == null) return 0
+      if (aVal == null) return sortOrder === 'asc' ? 1 : -1
+      if (bVal == null) return sortOrder === 'asc' ? -1 : 1
+
+      // String comparison (case-insensitive)
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        aVal = aVal.toLowerCase()
+        bVal = bVal.toLowerCase()
+      }
+
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }
+
+  const getSortIcon = (key: SortKey) => {
+    if (sortKey !== key) {
+      return <ArrowUpDown className="w-4 h-4 text-slate-400" />
+    }
+    return sortOrder === 'asc' ? (
+      <ArrowUp className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+    ) : (
+      <ArrowDown className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+    )
+  }
+
+  const sortedLeads = sortLeads(leads)
+
+  const handleDelete = async (leadId: string) => {
+    try {
+      setIsDeleting(true)
+      await deleteLead(api, leadId)
+      toast.success('Lead supprimé')
+      setDeleteConfirmId(null)
+      onLeadDeleted?.(leadId)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Impossible de supprimer le lead')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   const handleCopyPhone = async (phone: string, leadId: string) => {
     try {
@@ -38,12 +117,36 @@ export function LeadsDataTable({ leads, onPhoneClick }: LeadsDataTableProps) {
 
   if (leads.length === 0) {
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-12 text-center">
-        <Phone className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-        <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Aucun lead</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Aucun lead ne correspond à vos filtres
-        </p>
+      <div className="space-y-4">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-12 text-center">
+          <Phone className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
+          <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Aucun lead</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Aucun lead ne correspond à vos filtres
+          </p>
+        </div>
+
+        {/* Delete confirmation dialog even when no leads */}
+        <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer le lead</AlertDialogTitle>
+              <AlertDialogDescription>
+                Cette action est irréversible. Le lead sera supprimé définitivement.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-2 justify-end">
+              <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={isDeleting}
+                onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {isDeleting ? 'Suppression...' : 'Supprimer'}
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     )
   }
@@ -55,16 +158,37 @@ export function LeadsDataTable({ leads, onPhoneClick }: LeadsDataTableProps) {
           <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                Téléphone
+                <button
+                  onClick={() => toggleSort('phone_number')}
+                  className="flex items-center gap-2 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  Téléphone
+                  {getSortIcon('phone_number')}
+                </button>
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                Entreprise
+                <button
+                  onClick={() => toggleSort('company_name')}
+                  className="flex items-center gap-2 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  Entreprise
+                  {getSortIcon('company_name')}
+                </button>
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                 Domaine
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                Statut
+                Assigné à
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                <button
+                  onClick={() => toggleSort('status')}
+                  className="flex items-center gap-2 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  Statut
+                  {getSortIcon('status')}
+                </button>
               </th>
               <th className="px-6 py-3 text-center text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                 Score
@@ -73,7 +197,13 @@ export function LeadsDataTable({ leads, onPhoneClick }: LeadsDataTableProps) {
                 Appels
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                Créé
+                <button
+                  onClick={() => toggleSort('created_at')}
+                  className="flex items-center gap-2 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  Créé
+                  {getSortIcon('created_at')}
+                </button>
               </th>
               <th className="px-6 py-3 text-right text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                 Action
@@ -81,7 +211,7 @@ export function LeadsDataTable({ leads, onPhoneClick }: LeadsDataTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-            {leads.map((lead) => (
+            {sortedLeads.map((lead) => (
               <tr
                 key={lead.id}
                 className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-150 group"
@@ -135,6 +265,17 @@ export function LeadsDataTable({ leads, onPhoneClick }: LeadsDataTableProps) {
                   )}
                 </td>
 
+                {/* Assignee */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {lead.assigned_to ? (
+                    <span className="text-sm text-slate-900 dark:text-white font-medium">
+                      {truncate(lead.assigned_to, 20)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-slate-500 dark:text-slate-400">-</span>
+                  )}
+                </td>
+
                 {/* Status */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <StatusBadge status={lead.status} />
@@ -177,22 +318,57 @@ export function LeadsDataTable({ leads, onPhoneClick }: LeadsDataTableProps) {
 
                 {/* Action */}
                 <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <Link href={`/leads/${lead.id}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
-                    >
-                      Voir
-                      <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </Link>
+                  <div className="flex items-center justify-end gap-2">
+                    <Link href={`/leads/${lead.id}`}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+                      >
+                        Voir
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </Link>
+
+                    <RoleGuard roles={['owner', 'admin']} fallback={null}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteConfirmId(lead.id)}
+                        className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </RoleGuard>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le lead sera supprimé définitivement.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2 justify-end">
+            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? 'Suppression...' : 'Supprimer'}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

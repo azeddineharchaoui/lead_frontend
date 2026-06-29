@@ -37,12 +37,18 @@ export interface Lead {
   call_attempts: number;
   last_called_at: string | null;
   assigned_to?: string | null;
+  assigned_to_user_id?: string | null;
   qualification_score?: number | null;
   crm_pushed_at?: string | null;
   crm_push_attempts?: number;
   crm_last_error?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AssignLeadPayload {
+  agent_id: string;
+  notes?: string;
 }
 
 export interface HistoryEntry {

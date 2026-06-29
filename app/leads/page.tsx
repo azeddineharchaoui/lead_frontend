@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useApiClient } from '@/hooks/useApiClient'
-import { listLeads } from '@/lib/api'
+import { useAuthContext } from '@/lib/auth-context'
+import { listLeads, getMyLeads } from '@/lib/api'
 import { showApiError } from '@/lib/api-errors'
+import { RoleGuard } from '@/components/auth/RoleGuard'
 import type { Lead, LeadStatus } from '@/lib/types'
 import { PageHeader } from '@/components/page-header'
 import { LeadsFilterBar, type FilterState } from '@/components/leads/leads-filter-bar'
@@ -17,30 +20,74 @@ import { Plus, AlertCircle } from 'lucide-react'
 
 export default function LeadsPage() {
   const api = useApiClient()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { user } = useAuthContext()
+  
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
-  // Filters
+  // State from URL
   const [filters, setFilters] = useState<FilterState>({})
-
-  // Pagination
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+  const [mineOnly, setMineOnly] = useState(false)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
+
+  // Initialize state from URL
+  useEffect(() => {
+    const status = searchParams.get('status') as LeadStatus | null
+    const domain = searchParams.get('domain')
+    const pageParam = searchParams.get('page')
+    const pageSizeParam = searchParams.get('page_size')
+    const mineParam = searchParams.get('mine')
+
+    setFilters({
+      status: status || undefined,
+      domain: domain || undefined,
+    })
+    setPage(pageParam ? parseInt(pageParam, 10) : 1)
+    setPageSize(pageSizeParam ? parseInt(pageSizeParam, 10) : 20)
+    setMineOnly(mineParam === '1')
+  }, [searchParams])
 
   const fetchLeads = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await listLeads(api, {
-        page,
-        page_size: pageSize,
-        status: filters.status as LeadStatus | undefined,
-        domain: filters.domain,
-      })
+      
+      let response
+      if (mineOnly && user?.id) {
+        // Use getMyLeads if available, otherwise use listLeads with assigned_to_user_id filter
+        try {
+          response = await getMyLeads(api, {
+            page,
+            page_size: pageSize,
+            status: filters.status as LeadStatus | undefined,
+            domain: filters.domain,
+          })
+        } catch {
+          // Fallback to listLeads with filter
+          response = await listLeads(api, {
+            page,
+            page_size: pageSize,
+            status: filters.status as LeadStatus | undefined,
+            domain: filters.domain,
+            assigned_to_user_id: user.id,
+          })
+        }
+      } else {
+        response = await listLeads(api, {
+          page,
+          page_size: pageSize,
+          status: filters.status as LeadStatus | undefined,
+          domain: filters.domain,
+        })
+      }
+      
       setLeads(response.items)
       setTotal(response.total)
       setTotalPages(response.total_pages)
@@ -54,29 +101,52 @@ export default function LeadsPage() {
     } finally {
       setLoading(false)
     }
-  }, [api, page, pageSize, filters])
+  }, [api, page, pageSize, filters, mineOnly, user?.id])
 
   useEffect(() => {
     fetchLeads()
   }, [fetchLeads])
 
+  const updateURL = useCallback((newPage?: number, newFilters?: FilterState, newMine?: boolean) => {
+    const params = new URLSearchParams()
+    
+    const filterToUse = newFilters || filters
+    const pageToUse = newPage || page
+    const mineToUse = newMine !== undefined ? newMine : mineOnly
+
+    if (filterToUse.status) params.set('status', filterToUse.status)
+    if (filterToUse.domain) params.set('domain', filterToUse.domain)
+    if (pageToUse > 1) params.set('page', String(pageToUse))
+    if (pageSize !== 20) params.set('page_size', String(pageSize))
+    if (mineToUse) params.set('mine', '1')
+
+    const query = params.toString()
+    router.replace(`/leads${query ? '?' + query : ''}`)
+  }, [router, filters, page, pageSize, mineOnly])
+
   const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters)
-    setPage(1) // Reset to first page when filters change
+    updateURL(1, newFilters, mineOnly)
   }
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage)
+    updateURL(newPage)
   }
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize)
-    setPage(1) // Reset to first page when page size changes
+    updateURL(1)
+  }
+
+  const handleMineToggle = () => {
+    const newMine = !mineOnly
+    setMineOnly(newMine)
+    updateURL(1, filters, newMine)
   }
 
   const handleLeadCreated = () => {
-    setPage(1)
-    setFilters({})
+    updateURL(1, {}, mineOnly)
     fetchLeads()
   }
 
@@ -88,14 +158,16 @@ export default function LeadsPage() {
           title="Leads"
           description={`${total} leads totaux`}
         />
-        <Button
-          onClick={() => setIsCreateModalOpen(true)}
-          size="lg"
-          className="gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Créer un lead
-        </Button>
+        <RoleGuard roles={['owner', 'admin', 'agent']} fallback={null}>
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            size="lg"
+            className="gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Créer un lead
+          </Button>
+        </RoleGuard>
       </div>
 
       {/* Error state */}
@@ -108,11 +180,22 @@ export default function LeadsPage() {
 
       {/* Filters */}
       {!loading && (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
-          <LeadsFilterBar
-            onFilterChange={handleFilterChange}
-            isLoading={loading}
-          />
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <LeadsFilterBar
+              onFilterChange={handleFilterChange}
+              isLoading={loading}
+            />
+            <RoleGuard roles={['owner', 'admin', 'agent']} fallback={null}>
+              <Button
+                variant={mineOnly ? 'default' : 'outline'}
+                onClick={handleMineToggle}
+                className="whitespace-nowrap"
+              >
+                Mes leads
+              </Button>
+            </RoleGuard>
+          </div>
         </div>
       )}
 
@@ -120,7 +203,12 @@ export default function LeadsPage() {
       {loading ? (
         <LeadsTableSkeleton />
       ) : (
-        <LeadsDataTable leads={leads} />
+        <LeadsDataTable
+          leads={leads}
+          onLeadDeleted={(leadId) => {
+            setLeads(leads.filter(l => l.id !== leadId))
+          }}
+        />
       )}
 
       {/* Pagination */}
@@ -137,11 +225,13 @@ export default function LeadsPage() {
       )}
 
       {/* Create Lead Modal */}
-      <CreateLeadModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-        onLeadCreated={handleLeadCreated}
-      />
+      <RoleGuard roles={['owner', 'admin', 'agent']} fallback={null}>
+        <CreateLeadModal
+          open={isCreateModalOpen}
+          onOpenChange={setIsCreateModalOpen}
+          onLeadCreated={handleLeadCreated}
+        />
+      </RoleGuard>
     </div>
   )
 }
