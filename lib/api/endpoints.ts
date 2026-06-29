@@ -22,9 +22,14 @@ export const API = {
     status: (id: string) => `/api/v1/leads/${id}/status`,
     history: (id: string) => `/api/v1/leads/${id}/history`,
     assign: (id: string) => `/api/v1/leads/${id}/assign`,
+    bulkStatus: "/api/v1/leads/bulk-status",
     sessions: (leadId: string) => `/api/v1/leads/${leadId}/sessions`,
     session: (leadId: string, sessionId: string) =>
       `/api/v1/leads/${leadId}/sessions/${sessionId}`,
+  },
+  audit: {
+    list: "/api/v1/audit",
+    export: "/api/v1/audit/export",
   },
   chat: {
     webhook: "/webhook/chat",

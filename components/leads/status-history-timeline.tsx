@@ -1,10 +1,11 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import type { HistoryEntry } from '@/lib/types'
 import { useApiClient } from '@/hooks/useApiClient'
 import { getLeadHistory } from '@/lib/api'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Loader2, ArrowRight } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/format'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -132,6 +133,11 @@ export function StatusHistoryTimeline({ leadId }: StatusHistoryTimelineProps) {
           </div>
         )
       })}
+      
+      <Link href={`/audit?entity_id=${leadId}`} className="inline-flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 mt-4">
+        Voir dans le journal d&apos;audit
+        <ArrowRight className="w-4 h-4" />
+      </Link>
     </div>
   )
 }

@@ -36,16 +36,33 @@ interface LeadsDataTableProps {
   leads: Lead[]
   onPhoneClick?: (phone: string) => void
   onLeadDeleted?: (leadId: string) => void
+  selectedIds?: Set<string>
+  onSelectionChange?: (ids: Set<string>) => void
 }
 
-export function LeadsDataTable({ leads, onPhoneClick, onLeadDeleted }: LeadsDataTableProps) {
+export function LeadsDataTable({ leads, onPhoneClick, onLeadDeleted, selectedIds = new Set(), onSelectionChange }: LeadsDataTableProps) {
   const api = useApiClient()
-  const { user } = useAuth()
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  const toggleSelectLead = (leadId: string) => {
+    const newSelection = new Set(selectedIds)
+    if (newSelection.has(leadId)) {
+      newSelection.delete(leadId)
+    } else {
+      newSelection.add(leadId)
+    }
+    onSelectionChange?.(newSelection)
+  }
+
+  const toggleSelectAll = () => {
+    const allIds = new Set(sortedLeads.map((l) => l.id))
+    const newSelection = selectedIds.size === sortedLeads.length ? new Set() : allIds
+    onSelectionChange?.(newSelection)
+  }
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -157,6 +174,17 @@ export function LeadsDataTable({ leads, onPhoneClick, onLeadDeleted }: LeadsData
         <table className="w-full">
           <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
             <tr>
+              <RoleGuard roles={['owner', 'admin', 'agent']} fallback={null}>
+                <th className="px-4 py-3 text-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size > 0 && selectedIds.size === sortedLeads.length}
+                    indeterminate={selectedIds.size > 0 && selectedIds.size < sortedLeads.length}
+                    onChange={toggleSelectAll}
+                    className="rounded border-slate-300 dark:border-slate-600"
+                  />
+                </th>
+              </RoleGuard>
               <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                 <button
                   onClick={() => toggleSort('phone_number')}
@@ -216,6 +244,16 @@ export function LeadsDataTable({ leads, onPhoneClick, onLeadDeleted }: LeadsData
                 key={lead.id}
                 className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-150 group"
               >
+                <RoleGuard roles={['owner', 'admin', 'agent']} fallback={null}>
+                  <td className="px-4 py-4 whitespace-nowrap text-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(lead.id)}
+                      onChange={() => toggleSelectLead(lead.id)}
+                      className="rounded border-slate-300 dark:border-slate-600"
+                    />
+                  </td>
+                </RoleGuard>
                 {/* Phone */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-2">

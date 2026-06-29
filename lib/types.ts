@@ -4,6 +4,10 @@ export type LeadStatus = "nouveau" | "en_cours" | "qualifie" | "rejete";
 
 export type ChatChannel = "web_chat" | "whatsapp" | "sms" | "email";
 
+export type AuditAction = 'create' | 'update' | 'delete' | 'status_change' | 'crm_push';
+
+export type AuditEntityType = 'lead' | 'target' | 'session' | 'user' | 'api_key';
+
 export type ScrapingStatus = "success" | "failed" | "pending";
 
 export type TaskState = "pending" | "started" | "success" | "failure";
@@ -88,6 +92,30 @@ export interface LeadDetailResponse extends Lead {
 export interface CrmPushResponse {
   task_id: string;
   message: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  created_at: string;
+  action: AuditAction;
+  entity_type: AuditEntityType;
+  entity_id: string | null;
+  entity_label: string | null;
+  actor: string | null;
+  changes: Record<string, unknown> | null;
+  ip_address: string | null;
+}
+
+export interface BulkStatusPayload {
+  lead_ids: string[];
+  status: LeadStatus;
+  notes?: string;
+}
+
+export interface BulkStatusResponse {
+  updated: number;
+  failed: number;
+  errors: Array<{ lead_id: string; error: string }>;
 }
 
 export interface PaginatedResponse<T> {
